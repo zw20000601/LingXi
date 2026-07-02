@@ -23,9 +23,9 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useState, type ComponentType, type FormEvent, type ReactNode } from "react";
 
-import { apiJson } from "@/lib/api";
+import { apiJson, getToken, setToken, type AuthResponse } from "@/lib/api";
 import { Logo } from "../components/SiteHeader";
 
 type AdminTab = "data" | "cards" | "users" | "api" | "notice";
@@ -104,11 +104,23 @@ export default function AdminPage() {
   const [apiConfig, setApiConfig] = useState<ApiConfig>(defaultApiConfig);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [authChecked, setAuthChecked] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
   const activeLabel = navItems.find((item) => item.key === active)?.label ?? "数据";
+
+  useEffect(() => {
+    setAuthenticated(Boolean(getToken()));
+    setAuthChecked(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     async function loadAdminData() {
+      if (!authChecked) return;
+      if (!authenticated) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       setLoadError("");
       try {
@@ -121,14 +133,37 @@ export default function AdminPage() {
           setApiConfig({ ...defaultApiConfig, ...configData });
         }
       } catch (err) {
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : "后台数据加载失败");
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : "后台数据加载失败";
+          if (["Authentication required", "Invalid token", "User not found", "Admin access required"].includes(message)) {
+            window.localStorage.removeItem("lingxi_token");
+            setAuthenticated(false);
+          } else {
+            setLoadError(message);
+          }
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
     void loadAdminData();
     return () => { cancelled = true; };
-  }, []);
+  }, [authChecked, authenticated]);
+
+  function handleLogout() {
+    window.localStorage.removeItem("lingxi_token");
+    setDashboard(emptyDashboard);
+    setApiConfig(defaultApiConfig);
+    setAuthenticated(false);
+  }
+
+  if (!authChecked) {
+    return <main className="flex min-h-screen items-center justify-center bg-[#f5f8ff] text-sm font-bold text-[#70809d]">Loading...</main>;
+  }
+
+  if (!authenticated) {
+    return <AdminLoginPanel onLogin={() => setAuthenticated(true)} />;
+  }
 
   return (
     <main className="min-h-screen min-w-[1180px] bg-[#f5f8ff] text-[#111936]">
@@ -175,7 +210,7 @@ export default function AdminPage() {
               <span className="text-xs font-bold text-[#8a98b2]">⌘K</span>
             </label>
             <button onClick={() => adminNotice("暂无新的真实通知")} className="relative text-[#42506b]"><Bell className="h-5 w-5" /><span className="absolute -right-2 -top-2 rounded-full bg-[#ff5b69] px-1.5 text-[10px] font-bold text-white">0</span></button>
-            <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#f6e5d6] to-[#e5edf9] text-lg">A</div><span className="font-semibold text-[#42506b]">Admin</span><ChevronDown className="h-4 w-4 text-[#70809d]" /></div>
+            <button type="button" onClick={handleLogout} className="flex items-center gap-3 rounded-lg px-2 py-1 transition hover:bg-[#f5f8ff]" title="退出登录"><div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#f6e5d6] to-[#e5edf9] text-lg">A</div><span className="font-semibold text-[#42506b]">Admin</span><ChevronDown className="h-4 w-4 text-[#70809d]" /></button>
           </div>
         </header>
         <div className="px-10 py-6">
@@ -183,6 +218,82 @@ export default function AdminPage() {
           {active === "data" ? <Dashboard data={dashboard} loading={loading} /> : active === "api" ? <ApiConfigPanel config={apiConfig} onSaved={setApiConfig} /> : <ManagementPanel title={activeLabel} />}
           <footer className="mt-7 border-t border-[#dde7f4] pt-4 text-center text-sm text-[#8a98b2]">© 2024 灵析 Lingxi · 让效率触手可及 <span className="mx-8">服务条款</span><span>隐私政策</span><span className="mx-8">帮助中心</span></footer>
         </div>
+      </section>
+    </main>
+  );
+}
+
+function AdminLoginPanel({ onLogin }: { onLogin: () => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submitLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+    setError("");
+    try {
+      const response = await apiJson<AuthResponse>("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+      if (!response.user.is_admin) {
+        window.localStorage.removeItem("lingxi_token");
+        setError("当前账号不是管理员，请使用后台管理员邮箱登录");
+        return;
+      }
+      setToken(response.access_token);
+      onLogin();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "登录失败，请检查账号和密码");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(135deg,#eef6ff,#f7fbff)] px-6 text-[#111936]">
+      <section className="w-full max-w-[440px] rounded-xl border border-[#dce6f5] bg-white p-8 shadow-[0_24px_70px_rgba(39,76,135,0.12)]">
+        <div className="mb-8 flex items-center justify-center gap-3">
+          <Logo dark />
+          <span className="text-2xl font-black">灵析后台</span>
+        </div>
+        <form onSubmit={(event) => void submitLogin(event)} className="space-y-4">
+          <label className="block">
+            <span className="mb-2 block text-sm font-bold text-[#50607c]">管理员邮箱</span>
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className="h-12 w-full rounded-lg border border-[#dce6f5] bg-[#f8fbff] px-4 text-sm outline-none transition focus:border-[#176bff] focus:bg-white focus:ring-4 focus:ring-blue-50"
+              placeholder="admin@qq.com"
+              required
+            />
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-sm font-bold text-[#50607c]">管理员密码</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="h-12 w-full rounded-lg border border-[#dce6f5] bg-[#f8fbff] px-4 text-sm outline-none transition focus:border-[#176bff] focus:bg-white focus:ring-4 focus:ring-blue-50"
+              placeholder="请输入后台密码"
+              required
+            />
+          </label>
+          {error ? <div className="rounded-lg bg-red-50 px-4 py-3 text-sm font-bold text-red-600">{error}</div> : null}
+          <button
+            type="submit"
+            disabled={submitting}
+            className="flex h-12 w-full items-center justify-center rounded-lg bg-[#176bff] text-sm font-black text-white shadow-[0_14px_30px_rgba(23,107,255,0.22)] transition hover:bg-[#0f5bea] disabled:cursor-not-allowed disabled:bg-[#8ba3c8]"
+          >
+            {submitting ? "登录中..." : "登录后台"}
+          </button>
+        </form>
+        <Link href="/" className="mt-5 flex h-10 items-center justify-center rounded-lg text-sm font-bold text-[#176bff] hover:bg-blue-50">
+          返回官网
+        </Link>
       </section>
     </main>
   );

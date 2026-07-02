@@ -24,7 +24,7 @@ export type Job = {
 
 export type AuthResponse = {
   access_token: string;
-  user: { id: string; email: string; membership_status: string };
+  user: { id: string; email: string; membership_status: string; is_admin?: boolean };
 };
 
 export function getToken() {
