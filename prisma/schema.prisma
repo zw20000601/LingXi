@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-py"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipStatus {
+  FREE
+  PRO
+}
+
+enum JobType {
+  VIDEO_PARSE
+  VIDEO_TRANSCRIBE
+  COPY_REWRITE
+  CONVERT
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+model User {
+  id                String           @id @default(uuid())
+  email             String           @unique
+  password_hash     String
+  membership_status MembershipStatus @default(FREE)
+  created_at        DateTime         @default(now())
+  updated_at        DateTime         @updatedAt
+  jobs              Job[]
+  files             FileAsset[]
+
+  @@map("users")
+}
+
+model Job {
+  id              String     @id @default(uuid())
+  type            JobType
+  status          JobStatus  @default(PENDING)
+  input           Json?
+  result          Json?
+  error           String?
+  user_id         String
+  user            User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  input_file_id   String?
+  input_file      FileAsset? @relation("InputFile", fields: [input_file_id], references: [id])
+  output_file_id  String?
+  output_file     FileAsset? @relation("OutputFile", fields: [output_file_id], references: [id])
+  expires_at      DateTime
+  created_at      DateTime   @default(now())
+  updated_at      DateTime   @updatedAt
+
+  @@index([user_id, created_at])
+  @@index([status])
+  @@index([expires_at])
+  @@map("jobs")
+}
+
+model FileAsset {
+  id            String   @id @default(uuid())
+  original_name String
+  storage_path  String
+  mime_type     String?
+  size_bytes    Int
+  user_id       String
+  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  expires_at    DateTime
+  created_at    DateTime @default(now())
+  input_jobs    Job[]    @relation("InputFile")
+  output_jobs   Job[]    @relation("OutputFile")
+
+  @@index([user_id, created_at])
+  @@index([expires_at])
+  @@map("file_assets")
+}

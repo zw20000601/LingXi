@@ -1,0 +1,15 @@
+[Unit]
+Description=LingXi Next.js Web
+After=network.target
+
+[Service]
+User=lingxi
+WorkingDirectory=/opt/lingxi/apps/web
+Environment=NODE_ENV=production
+Environment=NEXT_PUBLIC_API_BASE_URL=https://example.com
+ExecStart=/usr/bin/npm run start -- --port 3000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

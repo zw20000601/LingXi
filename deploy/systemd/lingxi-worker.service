@@ -1,0 +1,14 @@
+[Unit]
+Description=LingXi Celery Worker
+After=network.target redis-server.service postgresql.service
+
+[Service]
+User=lingxi
+WorkingDirectory=/opt/lingxi/apps/api
+EnvironmentFile=/opt/lingxi/apps/api/.env
+ExecStart=/opt/lingxi/apps/api/.venv/bin/celery -A app.tasks.celery_app worker --loglevel=info
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
