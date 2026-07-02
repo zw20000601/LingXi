@@ -143,19 +143,6 @@ function FooterColumn({ title, links, muted }: { title: string; links: Array<[st
   );
 }
 
-export function DeerflowSignature() {
-  return (
-    <a
-      href="https://deerflow.tech"
-      target="_blank"
-      rel="noreferrer"
-      className="fixed bottom-3 right-3 z-50 rounded-full border border-white/20 bg-[#071331]/35 px-3 py-1.5 text-[11px] font-semibold text-white/42 backdrop-blur transition hover:bg-[#071331]/70 hover:text-white/78"
-    >
-      Created By Deerflow
-    </a>
-  );
-}
-
 export function PageShell({ children }: { children: ReactNode }) {
   return <main className="min-h-screen bg-[#f7fbff] text-[#101a35]">{children}</main>;
 }

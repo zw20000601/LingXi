@@ -496,3 +496,93 @@ select {
 .video-workbench button:hover {
   transform: translateY(-1px);
 }
+
+.admin-input {
+  height: 2.75rem;
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid #dce6f5;
+  background: #ffffff;
+  padding: 0 1rem;
+  color: #101936;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.admin-input:focus {
+  border-color: #176bff;
+  box-shadow: 0 0 0 4px rgba(23, 107, 255, 0.08);
+}
+
+.admin-primary,
+.admin-secondary,
+.admin-filter,
+.admin-page {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.admin-primary {
+  min-height: 2.75rem;
+  padding: 0 1.25rem;
+  background: #176bff;
+  color: #ffffff;
+  box-shadow: 0 12px 26px rgba(23, 107, 255, 0.22);
+}
+
+.admin-primary:hover {
+  background: #0f5bea;
+  transform: translateY(-1px);
+}
+
+.admin-secondary,
+.admin-filter,
+.admin-page {
+  min-height: 2.75rem;
+  border: 1px solid #dce6f5;
+  background: #ffffff;
+  color: #53617d;
+}
+
+.admin-secondary {
+  padding: 0 1.1rem;
+}
+
+.admin-filter {
+  padding: 0 1rem;
+}
+
+.admin-page {
+  height: 2.25rem;
+  min-height: 2.25rem;
+  min-width: 2.25rem;
+  padding: 0 0.75rem;
+}
+
+.admin-secondary:hover,
+.admin-filter:hover,
+.admin-page:hover {
+  border-color: #bcd0f4;
+  background: #f8fbff;
+  color: #176bff;
+}
+
+.admin-tr {
+  border-top: 1px solid #edf2f8;
+  transition: background 0.16s ease;
+}
+
+.admin-tr:hover {
+  background: #f9fbff;
+}
+
+.admin-tr td {
+  padding: 1rem 1.25rem;
+  white-space: nowrap;
+}
