@@ -1,5 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+
+import { getToken } from "@/lib/api";
 
 export type ActiveKey = "home" | "features" | "video" | "document" | "pdf" | "help";
 
@@ -13,6 +18,26 @@ const navItems: { key: ActiveKey; label: string; href: string }[] = [
 ];
 
 export function SiteHeader({ active, blend = false }: { active: ActiveKey; blend?: boolean }) {
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  useEffect(() => {
+    function syncAuthState() {
+      setLoggedIn(Boolean(getToken()));
+    }
+    syncAuthState();
+    window.addEventListener("storage", syncAuthState);
+    window.addEventListener("focus", syncAuthState);
+    return () => {
+      window.removeEventListener("storage", syncAuthState);
+      window.removeEventListener("focus", syncAuthState);
+    };
+  }, []);
+
+  function logout() {
+    window.localStorage.removeItem("lingxi_token");
+    setLoggedIn(false);
+  }
+
   return (
     <header className={`relative z-30 h-[76px] text-white ${blend ? "bg-transparent" : "bg-[#020817]/95 shadow-[0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl"}`}>
       <div className="mx-auto flex h-full max-w-[1380px] items-center justify-between px-8">
@@ -34,14 +59,25 @@ export function SiteHeader({ active, blend = false }: { active: ActiveKey; blend
           ))}
         </nav>
 
-        <div className="flex gap-3">
-          <Link href="/login" className="flex h-10 w-[78px] items-center justify-center rounded-lg border border-white/18 bg-white/[0.03] text-sm font-bold text-white transition hover:bg-white/[0.08]">
-            登录
-          </Link>
-          <Link href="/register" className="flex h-10 w-[78px] items-center justify-center rounded-lg bg-[#176bff] text-sm font-bold text-white shadow-[0_12px_28px_rgba(23,107,255,0.34)] transition hover:bg-[#2d7cff]">
-            注册
-          </Link>
-        </div>
+        {loggedIn ? (
+          <div className="flex items-center gap-3">
+            <Link href="/document-convert" className="flex h-10 min-w-[86px] items-center justify-center rounded-lg border border-white/18 bg-white/[0.03] px-4 text-sm font-bold text-white transition hover:bg-white/[0.08]">
+              已登录
+            </Link>
+            <button type="button" onClick={logout} className="flex h-10 w-[78px] items-center justify-center rounded-lg bg-[#176bff] text-sm font-bold text-white shadow-[0_12px_28px_rgba(23,107,255,0.34)] transition hover:bg-[#2d7cff]">
+              退出
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-3">
+            <Link href="/login" className="flex h-10 w-[78px] items-center justify-center rounded-lg border border-white/18 bg-white/[0.03] text-sm font-bold text-white transition hover:bg-white/[0.08]">
+              登录
+            </Link>
+            <Link href="/register" className="flex h-10 w-[78px] items-center justify-center rounded-lg bg-[#176bff] text-sm font-bold text-white shadow-[0_12px_28px_rgba(23,107,255,0.34)] transition hover:bg-[#2d7cff]">
+              注册
+            </Link>
+          </div>
+        )}
       </div>
     </header>
   );
