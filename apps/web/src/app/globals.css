@@ -129,10 +129,9 @@ body {
   z-index: 1;
 }
 
-@media (max-width: 1180px) {
-  main {
-    min-width: 1180px;
-  }
+.admin-shell,
+.video-workbench {
+  min-width: 1180px;
 }
 
 button,

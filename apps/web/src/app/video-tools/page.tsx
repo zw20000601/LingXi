@@ -78,23 +78,23 @@ function ParserPanel({ onCreated }: { onCreated: () => void }) {
   return (
     <section className="rounded-xl border border-[#e2eaf5] bg-white p-5 shadow-[0_12px_34px_rgba(45,83,148,0.08)]">
       <div className="inline-flex rounded-lg bg-[#f0f4fb] p-0.5">
-        <button onClick={() => setMode("parse")} className={`flex h-10 min-w-[150px] items-center justify-center gap-2 rounded-md px-5 text-sm font-black ${mode === "parse" ? "bg-white text-[#176bff] shadow-sm" : "text-[#52627f]"}`}><Video className="h-4 w-4" />视频提取</button>
-        <button onClick={() => setMode("transcribe")} className={`flex h-10 min-w-[170px] items-center justify-center gap-2 rounded-md px-5 text-sm font-black ${mode === "transcribe" ? "bg-white text-[#176bff] shadow-sm" : "text-[#52627f]"}`}><FileText className="h-4 w-4" />文案字幕提取</button>
+        <button type="button" onClick={() => setMode("parse")} className={`flex h-10 min-w-[150px] items-center justify-center gap-2 rounded-md px-5 text-sm font-black ${mode === "parse" ? "bg-white text-[#176bff] shadow-sm" : "text-[#52627f]"}`}><Video className="h-4 w-4" />视频提取</button>
+        <button type="button" onClick={() => setMode("transcribe")} className={`flex h-10 min-w-[170px] items-center justify-center gap-2 rounded-md px-5 text-sm font-black ${mode === "transcribe" ? "bg-white text-[#176bff] shadow-sm" : "text-[#52627f]"}`}><FileText className="h-4 w-4" />文案字幕提取</button>
       </div>
       <h2 className="mt-6 text-sm font-black">视频链接</h2>
       <div className="mt-3 flex h-11 items-center gap-3 rounded-lg border border-[#dbe5f2] px-4 text-[#71809b]">
         <Link2 className="h-5 w-5 text-[#176bff]" />
         <input className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#93a0b9]" placeholder="请输入视频链接，例如：https://www.example.com/watch?v=xxxx" value={url} onChange={(event) => setUrl(event.target.value)} />
-        {url ? <button onClick={() => setUrl("")} aria-label="清空链接"><X className="h-4 w-4 text-[#a7b2c6]" /></button> : null}
+        {url ? <button type="button" onClick={() => setUrl("")} aria-label="清空链接"><X className="h-4 w-4 text-[#a7b2c6]" /></button> : null}
       </div>
       <p className="mt-3 text-sm text-[#667693]">支持复制链接或粘贴分享链接。</p>
-      <button onClick={submit} disabled={submitting} className="mt-5 h-11 w-full rounded-lg bg-[#176bff] text-sm font-black text-white shadow-[0_10px_26px_rgba(23,107,255,0.25)] disabled:opacity-60">
+      <button type="button" onClick={submit} disabled={submitting} className="mt-5 h-11 w-full rounded-lg bg-[#176bff] text-sm font-black text-white shadow-[0_10px_26px_rgba(23,107,255,0.25)] disabled:opacity-60">
         {submitting ? "提交中..." : mode === "parse" ? "开始提取" : "开始提取文案/字幕"}
       </button>
       {message ? <div className="mt-3 rounded-lg bg-[#f2f7ff] px-4 py-3 text-sm font-medium text-[#176bff]">{message}</div> : null}
       <h2 className="mt-6 text-sm font-black">支持的平台</h2>
       <div className="mt-4 grid grid-cols-8 gap-4 text-center">
-        {platforms.map(([name, mark, color]) => <button key={name} onClick={() => setMessage(`${name} 平台已选，粘贴链接后即可提交`)}><span className={`mx-auto flex h-8 w-8 items-center justify-center rounded-lg text-sm font-black ${color}`}>{mark}</span><div className="mt-2 text-xs text-[#667693]">{name}</div></button>)}
+        {platforms.map(([name, mark, color]) => <button type="button" key={name} onClick={() => setMessage(`${name} 平台已选，粘贴链接后即可提交`)}><span className={`mx-auto flex h-8 w-8 items-center justify-center rounded-lg text-sm font-black ${color}`}>{mark}</span><div className="mt-2 text-xs text-[#667693]">{name}</div></button>)}
       </div>
       <div className="mt-7 rounded-lg bg-[#f2f7ff] px-4 py-3 text-sm font-medium text-[#176bff]">请确保拥有视频的合法使用权，仅用于个人学习与研究。</div>
     </section>
@@ -109,7 +109,7 @@ function ResultPanel({ job, loading }: { job: Job | null; loading: boolean }) {
       {!job ? <EmptyState text={loading ? "正在读取真实解析记录..." : "暂无真实解析结果"} /> : (
         <>
           <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-            <button onClick={() => window.alert("真实视频播放预览接口后续可继续接入")} className="flex h-[158px] items-center justify-center overflow-hidden rounded-lg bg-[#edf4ff] text-[#176bff]"><Play className="h-12 w-12" /></button>
+            <button type="button" aria-label="视频预览暂未接入" onClick={() => undefined} className="flex h-[158px] items-center justify-center overflow-hidden rounded-lg bg-[#edf4ff] text-[#176bff]"><Play className="h-12 w-12" /></button>
             <div>
               <h3 className="text-[19px] font-black">{result.title || job.input_file?.original_name || "视频解析任务"}</h3>
               <div className="mt-8 grid grid-cols-3 gap-y-6 text-sm">
@@ -135,8 +135,8 @@ function RecentTasks({ jobs, loading, error, onRefresh }: { jobs: Job[]; loading
   return (
     <section className="mt-5 rounded-xl border border-[#e2eaf5] bg-white p-5 shadow-[0_12px_34px_rgba(45,83,148,0.08)]">
       <div className="flex items-center justify-between">
-        <h2 className="text-[18px] font-black">最近任务<button onClick={onRefresh} className="ml-3 rounded-md border border-[#dbe5f2] px-3 py-1 text-sm font-medium text-[#52627f]"><RefreshCw className="mr-1 inline h-4 w-4" />刷新</button></h2>
-        <button onClick={onRefresh} className="flex items-center gap-2 text-sm font-bold text-[#176bff]">查看全部任务 <ArrowRight className="h-4 w-4" /></button>
+        <h2 className="text-[18px] font-black">最近任务<button type="button" onClick={onRefresh} className="ml-3 rounded-md border border-[#dbe5f2] px-3 py-1 text-sm font-medium text-[#52627f]"><RefreshCw className="mr-1 inline h-4 w-4" />刷新</button></h2>
+        <button type="button" onClick={onRefresh} className="flex items-center gap-2 text-sm font-bold text-[#176bff]">查看全部任务 <ArrowRight className="h-4 w-4" /></button>
       </div>
       <div className="mt-4 grid grid-cols-[1.5fr_0.8fr_1fr_0.7fr_1fr_0.7fr] border-b border-[#e5ebf5] px-3 pb-3 text-sm font-medium text-[#667693]">
         {["任务", "来源", "内容", "状态", "创建时间", "操作"].map((h) => <span key={h}>{h}</span>)}
@@ -152,7 +152,7 @@ function Info({ label, value }: { label: string; value: string }) {
 
 function ExtractCard({ title, desc }: { title: string; desc: string }) {
   async function copy() { await navigator.clipboard?.writeText(desc); }
-  return <button onClick={() => void copy()} className="rounded-lg border border-[#e2eaf5] p-4 text-left"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f1ecff] text-[#7b45ee]"><FileText className="h-5 w-5" /></span><span><span className="block font-black">{title}</span><span className="line-clamp-2 text-xs text-[#667693]">{desc}</span></span></div></button>;
+  return <button type="button" onClick={() => void copy()} className="rounded-lg border border-[#e2eaf5] p-4 text-left"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f1ecff] text-[#7b45ee]"><FileText className="h-5 w-5" /></span><span><span className="block font-black">{title}</span><span className="line-clamp-2 text-xs text-[#667693]">{desc}</span></span></div></button>;
 }
 
 function TaskRow({ job, onRefresh }: { job: Job; onRefresh: () => void }) {
@@ -169,9 +169,9 @@ function TaskRow({ job, onRefresh }: { job: Job; onRefresh: () => void }) {
       <span><span className={`rounded-full px-3 py-1 text-xs font-bold ${jobStatusClass(job.status)}`}>{jobStatusText(job.status)}</span></span>
       <span>{formatDate(job.created_at)}</span>
       <span className="flex gap-3 text-[#176bff]">
-        <button onClick={() => void handleDownload()} title="下载或复制"><ArrowDownToLine className="h-4 w-4" /></button>
-        <button onClick={() => void copyResult()} title="复制结果"><Copy className="h-4 w-4" /></button>
-        <button onClick={() => void handleDelete()} title="删除任务"><Trash2 className="h-4 w-4" /></button>
+        <button type="button" onClick={() => void handleDownload()} title="下载或复制" aria-label="下载或复制"><ArrowDownToLine className="h-4 w-4" /></button>
+        <button type="button" onClick={() => void copyResult()} title="复制结果" aria-label="复制结果"><Copy className="h-4 w-4" /></button>
+        <button type="button" onClick={() => void handleDelete()} title="删除任务" aria-label="删除任务"><Trash2 className="h-4 w-4" /></button>
       </span>
     </div>
   );

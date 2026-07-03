@@ -37,8 +37,9 @@ import {
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ComponentType, type FormEvent, type ReactNode } from "react";
 
-import { apiJson, getToken, setToken, type AuthResponse } from "@/lib/api";
+import { ApiError, apiJson, getToken, setToken, type AuthResponse } from "@/lib/api";
 import { Logo } from "../components/SiteHeader";
+import { ActionGroup, AdminField, AdminTable, EmptyState, FilterBar, IconButton, InfoRow, Modal, PageTitle, Pagination, Panel, SearchBox, SelectBox, StatusBadge, TypeBadge } from "./ui";
 
 type AdminTab = "data" | "cards" | "users" | "api" | "notice";
 type NavItem = { key: AdminTab; label: string; icon: ComponentType<{ className?: string }> };
@@ -249,7 +250,7 @@ export default function AdminPage() {
       } catch (err) {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : "后台数据加载失败";
-          if (["Authentication required", "Invalid token", "User not found", "Admin access required"].includes(message)) {
+          if (err instanceof ApiError && [401, 403].includes(err.status)) {
             window.localStorage.removeItem("lingxi_token");
             setAuthenticated(false);
           } else {
@@ -285,7 +286,7 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen min-w-[1180px] bg-[#f6f9ff] text-[#101936]">
+    <main className="admin-shell min-h-screen bg-[#f6f9ff] text-[#101936]">
       <aside className="fixed inset-y-0 left-0 z-30 flex w-[244px] flex-col border-r border-[#e4ebf6] bg-white/92 shadow-[18px_0_42px_rgba(52,79,130,0.06)] backdrop-blur-xl">
         <div className="flex h-[88px] items-center gap-3 px-8">
           <Logo dark />
@@ -331,7 +332,7 @@ export default function AdminPage() {
             <div className="relative">
               <div className="flex items-center gap-2 rounded-lg px-2 py-1 transition hover:bg-[#eef5ff]">
                 <label className="flex h-11 w-11 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-[#eef3fb] text-sm font-black">
-                  {adminAvatar ? <img src={adminAvatar} alt="管理员头像" className="h-full w-full object-cover" /> : "管"}
+                  {adminAvatar ? <span aria-label="管理员头像" className="h-full w-full bg-cover bg-center" style={{ backgroundImage: `url(${adminAvatar})` }} /> : "管"}
                   <input type="file" accept="image/*" className="hidden" onChange={(event) => {
                     const file = event.target.files?.[0];
                     if (!file) return;
@@ -692,14 +693,6 @@ function NoticePanel({ notices, setNotices, onAction }: { notices: Notice[]; set
   );
 }
 
-function PageTitle({ title, desc, action }: { title: string; desc: string; action?: ReactNode }) {
-  return <div className="flex items-end justify-between"><div><h1 className="text-[30px] font-black tracking-normal">{title}</h1><p className="mt-3 text-[15px] font-medium text-[#667693]">{desc}</p></div>{action}</div>;
-}
-
-function Panel({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
-  return <section className="rounded-xl border border-[#e3ebf6] bg-white p-6 shadow-[0_14px_36px_rgba(39,76,135,0.08)]">{title || action ? <div className="mb-5 flex items-center justify-between"><h2 className="text-lg font-black">{title}</h2>{action}</div> : null}{children}</section>;
-}
-
 function MetricCard({ label, value, sub, icon: Icon, tone }: { label: string; value: string | number; sub: string; icon: ComponentType<{ className?: string }>; tone: string }) {
   return <section className="flex items-center gap-5 rounded-xl border border-[#e3ebf6] bg-white p-6 shadow-[0_14px_36px_rgba(39,76,135,0.08)]"><div className={`flex h-16 w-16 items-center justify-center rounded-full ${toneBg(tone)}`}><Icon className={`h-8 w-8 ${accentText(tone)}`} /></div><div><div className="text-sm font-bold text-[#7b88a4]">{label}</div><div className="mt-2 text-[30px] font-black leading-none">{typeof value === "number" ? formatNumber(value) : value}</div><div className="mt-3 text-sm font-bold text-[#667693]">{sub}</div></div></section>;
 }
@@ -728,53 +721,6 @@ function DonutPanel({ data }: { data: Array<{ name: string; value: number }> }) 
 
 function RankCard({ rank, name, count, share }: { rank: number; name: string; count: number; share: number }) {
   return <div className="relative rounded-lg border border-[#e3ebf6] bg-[#fbfdff] p-5"><span className={`absolute left-5 top-5 flex h-6 w-6 items-center justify-center rounded-full text-xs font-black text-white ${rank <= 3 ? "bg-[#ff9f2d]" : "bg-[#667693]"}`}>{rank}</span><div className="mx-auto mt-2 flex h-14 w-14 items-center justify-center rounded-full bg-[#eef5ff] text-[#176bff]"><FileText className="h-7 w-7" /></div><div className="mt-4 text-center font-black">{name}</div><div className="mt-4 grid grid-cols-2 gap-3 text-center text-xs text-[#667693]"><div>使用次数<br /><b className="text-[#53617d]">{formatNumber(count)}</b></div><div>占比<br /><b className="text-[#53617d]">{share.toFixed(1)}%</b></div></div></div>;
-}
-
-function FilterBar({ children }: { children: ReactNode }) {
-  return <div className="flex items-center gap-4 rounded-xl border border-[#e3ebf6] bg-white p-5 shadow-[0_14px_36px_rgba(39,76,135,0.08)]">{children}</div>;
-}
-
-function SearchBox({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) {
-  return <label className="flex h-11 w-[330px] items-center gap-3 rounded-lg border border-[#dce6f5] bg-white px-4 text-[#9aa8c0]"><Search className="h-5 w-5" /><input value={value} onChange={(event) => onChange(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder={placeholder} /></label>;
-}
-
-function SelectBox({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: string[] }) {
-  return <label className="relative"><select value={value} onChange={(event) => onChange(event.target.value)} className="h-11 w-[190px] appearance-none rounded-lg border border-[#dce6f5] bg-white px-4 text-sm font-bold text-[#53617d] outline-none">{options.map((option) => <option key={option}>{option}</option>)}</select><ChevronDown className="pointer-events-none absolute right-4 top-3.5 h-4 w-4 text-[#8b98b2]" /></label>;
-}
-
-function AdminTable({ headers, children }: { headers: string[]; children: ReactNode }) {
-  return <div className="overflow-hidden rounded-lg border border-[#e3ebf6]"><table className="w-full text-left text-sm"><thead className="bg-[#f8fbff] text-[#53617d]"><tr>{headers.map((header) => <th key={header} className="px-5 py-4 font-black">{header}</th>)}</tr></thead><tbody className="text-[#33415f]">{children}</tbody></table></div>;
-}
-
-function ActionGroup({ actions }: { actions: Array<[string, () => void]> }) {
-  return <div className="flex items-center gap-4">{actions.map(([label, action]) => <button key={label} type="button" onClick={action} className={`font-black transition ${label === "删除" || label === "禁用" ? "text-red-500 hover:text-red-600" : "text-[#176bff] hover:text-[#0f5bea]"}`}>{label}</button>)}</div>;
-}
-
-function Pagination({ total, pageSize }: { total: number; pageSize: string }) {
-  return <div className="mt-5 flex items-center justify-between text-sm font-bold text-[#667693]"><span>共 {total} 条</span><div className="flex items-center gap-3"><button type="button" className="admin-page"><ChevronLeft className="h-4 w-4" /></button><button type="button" className="admin-page border-[#176bff] text-[#176bff]">1</button><button type="button" className="admin-page"><ChevronRight className="h-4 w-4" /></button><button type="button" className="admin-filter">{pageSize}<ChevronDown className="h-4 w-4" /></button></div></div>;
-}
-
-function StatusBadge({ value }: { value: string }) {
-  const good = ["正常", "未使用", "已发布", "已启用"].includes(value);
-  const warn = ["草稿", "未配置"].includes(value);
-  return <span className={`inline-flex rounded-md px-2.5 py-1 text-xs font-black ${good ? "bg-emerald-50 text-emerald-600" : warn ? "bg-slate-100 text-slate-500" : value === "已使用" ? "bg-blue-50 text-[#176bff]" : "bg-red-50 text-red-500"}`}>{value}</span>;
-}
-
-function TypeBadge({ value }: { value: string }) {
-  const cls = value === "系统通知" ? "bg-blue-50 text-[#176bff]" : value === "重要通知" ? "bg-violet-50 text-violet-600" : value === "功能更新" ? "bg-orange-50 text-orange-500" : "bg-slate-100 text-slate-600";
-  return <span className={`inline-flex rounded-md px-2.5 py-1 text-xs font-black ${cls}`}>{value}</span>;
-}
-
-function InfoRow({ label, value, link = false }: { label: string; value: string; link?: boolean }) {
-  return <div className="mt-3 grid grid-cols-[90px_1fr] text-sm"><span className="font-bold text-[#7b88a4]">{label}</span><span className={`font-bold ${link ? "text-[#176bff]" : "text-[#33415f]"}`}>{value}</span></div>;
-}
-
-function IconButton({ label, icon: Icon, onClick, danger = false }: { label: string; icon: ComponentType<{ className?: string }>; onClick: () => void; danger?: boolean }) {
-  return <button type="button" onClick={onClick} className={`flex items-center gap-2 text-sm font-black transition ${danger ? "text-red-500 hover:text-red-600" : "text-[#176bff] hover:text-[#0f5bea]"}`}><Icon className="h-4 w-4" />{label}</button>;
-}
-
-function AdminField({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="block"><span className="mb-2 block text-sm font-bold text-[#53617d]">{label}</span>{children}</label>;
 }
 
 function SecretInput({ value, visible, onToggle, onChange }: { value: string; visible?: boolean; onToggle: () => void; onChange: (value: string) => void }) {
@@ -867,14 +813,6 @@ function CustomConfigModal({ onClose, onSaved }: { onClose: () => void; onSaved:
 function NoticeModal({ notice, onClose, onSave }: { notice: Notice; onClose: () => void; onSave: (notice: Notice) => void }) {
   const [draft, setDraft] = useState(notice);
   return <Modal title="公告编辑" onClose={onClose}><div className="space-y-4"><AdminField label="公告标题"><input className="admin-input" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="请输入公告标题" /></AdminField><div className="grid grid-cols-2 gap-4"><AdminField label="类型"><SelectBox value={draft.type} onChange={(value) => setDraft({ ...draft, type: value as Notice["type"] })} options={["系统通知", "重要通知", "功能更新", "使用指南"]} /></AdminField><AdminField label="状态"><SelectBox value={noticeStatusLabel(draft.status)} onChange={(value) => setDraft({ ...draft, status: value === "已发布" ? "PUBLISHED" : "DRAFT" })} options={["已发布", "草稿"]} /></AdminField></div><AdminField label="公告内容"><textarea className="min-h-[160px] w-full resize-y rounded-lg border border-[#dce6f5] bg-white px-4 py-3 text-sm outline-none focus:border-[#176bff] focus:ring-4 focus:ring-blue-50" value={draft.content} onChange={(event) => setDraft({ ...draft, content: event.target.value })} placeholder="请输入公告正文，支持填写维护时间、影响范围、更新说明等内容" /></AdminField></div><div className="mt-5 flex justify-end gap-3"><button type="button" onClick={onClose} className="admin-secondary">取消</button><button type="button" onClick={() => onSave({ ...draft, time: draft.time || nowText() })} className="admin-primary"><Save className="h-4 w-4" />保存公告</button></div></Modal>;
-}
-
-function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#101936]/30 px-6 backdrop-blur-sm"><section className="w-full max-w-[560px] rounded-xl bg-white p-6 shadow-[0_30px_90px_rgba(16,25,54,0.26)]"><div className="mb-5 flex items-center justify-between"><h2 className="text-xl font-black">{title}</h2><button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-[#eef5ff]"><X className="h-5 w-5" /></button></div>{children}</section></div>;
-}
-
-function EmptyState({ text }: { text: string }) {
-  return <div className="flex h-[220px] items-center justify-center rounded-lg border border-dashed border-[#dce6f5] bg-[#f8fbff] text-sm font-bold text-[#8b98b2]">{text}</div>;
 }
 
 function stripBuiltInConfig(config: ApiConfig) {

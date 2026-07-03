@@ -1,4 +1,17 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE_URL = configuredApiBaseUrl ?? (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "");
+
+export class ApiError extends Error {
+  status: number;
+  detail: unknown;
+
+  constructor(status: number, message: string, detail: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
 
 export type FileAsset = {
   id: string;
@@ -37,6 +50,9 @@ export function setToken(token: string) {
 }
 
 export async function apiJson<T>(path: string, options: RequestInit = {}): Promise<T> {
+  if (!API_BASE_URL) {
+    throw new ApiError(500, "生产环境未配置 API 地址，请设置 NEXT_PUBLIC_API_BASE_URL", "API base URL missing");
+  }
   const token = getToken();
   const headers = new Headers(options.headers);
   if (!headers.has("Content-Type") && options.body && !(options.body instanceof FormData)) {
@@ -47,7 +63,7 @@ export async function apiJson<T>(path: string, options: RequestInit = {}): Promi
   const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: "请求失败" }));
-    throw new Error(formatApiError(error.detail));
+    throw new ApiError(response.status, formatApiError(error.detail), error.detail);
   }
   return response.json() as Promise<T>;
 }
@@ -108,6 +124,9 @@ function translateValidationMessage(field: string, message: string): string {
 }
 
 export async function downloadFile(path: string) {
+  if (!API_BASE_URL) {
+    throw new ApiError(500, "生产环境未配置 API 地址，请设置 NEXT_PUBLIC_API_BASE_URL", "API base URL missing");
+  }
   const token = getToken();
   const headers = new Headers();
   if (token) headers.set("Authorization", `Bearer ${token}`);
@@ -115,7 +134,7 @@ export async function downloadFile(path: string) {
   const response = await fetch(`${API_BASE_URL}${path}`, { headers });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: "下载失败" }));
-    throw new Error(formatApiError(error.detail));
+    throw new ApiError(response.status, formatApiError(error.detail), error.detail);
   }
 
   const blob = await response.blob();

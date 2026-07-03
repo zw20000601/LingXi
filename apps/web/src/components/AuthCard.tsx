@@ -91,9 +91,9 @@ export function AuthCard({ mode }: { mode: "login" | "register" }) {
     <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_82%_18%,rgba(201,225,255,0.85),transparent_34%),linear-gradient(135deg,#f8fbff_0%,#edf5ff_46%,#dcecff_100%)] text-[#08142d]">
       <div className="absolute -right-20 -top-24 h-[460px] w-[460px] rounded-full border border-white/80" />
       <div className="absolute bottom-[-120px] right-[520px] h-[240px] w-[240px] rounded-full bg-[#c6ddff]/30 blur-sm" />
-      <div className="mx-auto grid min-h-screen max-w-[1380px] grid-cols-[1fr_590px] items-center gap-12 px-16 py-12">
-        <section>
-          <Link href="/" className="mb-28 flex items-center gap-3">
+      <div className="mx-auto grid min-h-screen max-w-[1380px] grid-cols-1 items-center gap-10 px-6 py-8 lg:grid-cols-[1fr_590px] lg:px-16 lg:py-12">
+        <section className="hidden lg:block">
+          <Link href="/" className="mb-20 flex items-center gap-3 xl:mb-28">
             <Logo dark />
             <span className="text-[28px] font-black">灵析</span>
           </Link>
@@ -105,7 +105,7 @@ export function AuthCard({ mode }: { mode: "login" | "register" }) {
           <AdvantageStrip />
         </section>
 
-        <section className="rounded-[24px] bg-white/70 px-14 py-14 shadow-[0_24px_80px_rgba(56,104,178,0.16)] ring-1 ring-white/72 backdrop-blur-xl">
+        <section className="rounded-[24px] bg-white/70 px-6 py-8 shadow-[0_24px_80px_rgba(56,104,178,0.16)] ring-1 ring-white/72 backdrop-blur-xl sm:px-10 lg:px-14 lg:py-14">
           <h2 className="text-center text-[32px] font-black tracking-normal">欢迎回来</h2>
           <p className="mt-4 text-center text-[17px] font-medium text-[#667693]">{isLogin ? "登录灵析，继续高效工作" : "注册灵析，开启高效工作"}</p>
           <div className="mt-9 grid grid-cols-2 border-b border-[#d6e2f3] text-center text-[16px] font-black">
@@ -116,12 +116,12 @@ export function AuthCard({ mode }: { mode: "login" | "register" }) {
           <div className="mt-8 space-y-5">
             <label className="auth-input">
               <Mail className="h-5 w-5 text-[#95a1b7]" />
-              <input type="email" placeholder="请输入邮箱地址" value={email} onChange={(event) => setEmail(event.target.value)} />
+              <input type="email" aria-label="邮箱地址" placeholder="请输入邮箱地址" value={email} onChange={(event) => setEmail(event.target.value)} />
             </label>
             {!isLogin ? (
               <div className="auth-input pr-2">
                 <ShieldCheck className="h-5 w-5 text-[#95a1b7]" />
-                <input inputMode="numeric" maxLength={6} placeholder="请输入验证码" value={verificationCode} onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6))} />
+                <input inputMode="numeric" aria-label="验证码" maxLength={6} placeholder="请输入验证码" value={verificationCode} onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6))} />
                 <button type="button" onClick={() => void sendVerificationCode()} disabled={sendingCode || codeCountdown > 0 || !email} className="h-10 shrink-0 rounded-lg bg-[#176bff]/10 px-4 text-sm font-black text-[#176bff] transition hover:bg-[#176bff]/15 disabled:cursor-not-allowed disabled:bg-[#eef4ff] disabled:text-[#8ba3c8]">
                   {codeCountdown > 0 ? `${codeCountdown}s` : sendingCode ? "发送中" : "发送验证码"}
                 </button>
@@ -129,14 +129,14 @@ export function AuthCard({ mode }: { mode: "login" | "register" }) {
             ) : null}
             <label className="auth-input">
               <Lock className="h-5 w-5 text-[#95a1b7]" />
-              <input type="password" placeholder="请输入密码" value={password} onChange={(event) => setPassword(event.target.value)} />
+              <input type="password" aria-label="密码" placeholder="请输入密码" value={password} onChange={(event) => setPassword(event.target.value)} />
               <Eye className="h-5 w-5 text-[#95a1b7]" />
             </label>
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 text-[#667693]"><span className="flex h-4 w-4 items-center justify-center rounded bg-[#176bff] text-[10px] text-white">✓</span>记住我</label>
-              <button onClick={() => setMessage("找回密码接口尚未接入")} className="font-bold text-[#176bff]">忘记密码?</button>
+              <button type="button" onClick={() => setMessage("找回密码接口尚未接入")} className="font-bold text-[#176bff]">忘记密码?</button>
             </div>
-            <button onClick={() => void submit()} className="h-[58px] w-full rounded-lg bg-[#176bff] text-base font-black text-white shadow-[0_14px_30px_rgba(23,107,255,0.26)]">{isLogin ? "登录" : "注册"}</button>
+            <button type="button" onClick={() => void submit()} className="h-[58px] w-full rounded-lg bg-[#176bff] text-base font-black text-white shadow-[0_14px_30px_rgba(23,107,255,0.26)]">{isLogin ? "登录" : "注册"}</button>
           </div>
 
           <div className="my-9 flex items-center gap-5 text-sm font-medium text-[#95a1b7]"><span className="h-px flex-1 bg-[#d6e2f3]" />或使用其他方式登录<span className="h-px flex-1 bg-[#d6e2f3]" /></div>
@@ -190,7 +190,7 @@ function AdvantageStrip() {
 }
 
 function Social({ label, icon, color = "text-[#111827]" }: { label?: string; icon?: ReactNode; color?: string }) {
-  return <button onClick={() => window.alert(`${label ?? "第三方"} 登录接口尚未接入`)} className="flex h-16 w-16 items-center justify-center rounded-full border border-[#dfe7f3] bg-white text-[28px] font-black shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><span className={color}>{icon ?? label}</span></button>;
+  return <button type="button" aria-label={`${label ?? "第三方"} 登录暂未接入`} onClick={() => undefined} className="flex h-16 w-16 items-center justify-center rounded-full border border-[#dfe7f3] bg-white text-[28px] font-black shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><span className={color}>{icon ?? label}</span></button>;
 }
 
 function OrbitTile({ className, children, tone }: { className: string; children: ReactNode; tone: "blue" | "red" | "green" }) {

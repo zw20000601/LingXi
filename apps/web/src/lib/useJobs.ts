@@ -34,6 +34,14 @@ export function useJobs({ types, limit = 30 }: JobFilter = {}) {
     refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    if (!jobs.some((job) => job.status === "PENDING" || job.status === "RUNNING")) return;
+    const timer = window.setInterval(() => {
+      void refresh();
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [jobs, refresh]);
+
   return { jobs, loading, error, refresh };
 }
 

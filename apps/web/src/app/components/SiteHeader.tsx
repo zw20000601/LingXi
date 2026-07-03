@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
-import { apiJson, getToken } from "@/lib/api";
+import { ApiError, apiJson, getToken } from "@/lib/api";
 
 export type ActiveKey = "home" | "features" | "video" | "document" | "pdf" | "help";
 
@@ -19,6 +19,7 @@ const navItems: { key: ActiveKey; label: string; href: string }[] = [
 
 export function SiteHeader({ active, blend = false }: { active: ActiveKey; blend?: boolean }) {
   const [loggedIn, setLoggedIn] = useState(false);
+  const [authMessage, setAuthMessage] = useState("");
 
   useEffect(() => {
     function syncAuthState() {
@@ -32,14 +33,18 @@ export function SiteHeader({ active, blend = false }: { active: ActiveKey; blend
       try {
         await apiJson("/api/auth/me");
         setLoggedIn(true);
-      } catch {
-        window.localStorage.removeItem("lingxi_token");
-        setLoggedIn(false);
-        window.alert("账号已被禁用或登录已失效，请重新登录");
+      } catch (err) {
+        if (err instanceof ApiError && [401, 403].includes(err.status)) {
+          window.localStorage.removeItem("lingxi_token");
+          setLoggedIn(false);
+          setAuthMessage("账号已被禁用或登录已失效，请重新登录");
+          window.setTimeout(() => setAuthMessage(""), 3200);
+        }
       }
     }
     syncAuthState();
-    const timer = window.setInterval(() => { void verifyAccount(); }, 3000);
+    void verifyAccount();
+    const timer = window.setInterval(() => { void verifyAccount(); }, 20000);
     window.addEventListener("storage", syncAuthState);
     window.addEventListener("focus", verifyAccount);
     return () => {
@@ -56,6 +61,7 @@ export function SiteHeader({ active, blend = false }: { active: ActiveKey; blend
 
   return (
     <header className={`relative z-30 h-[76px] text-white ${blend ? "bg-transparent" : "bg-[#020817]/95 shadow-[0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl"}`}>
+      {authMessage ? <div className="fixed right-6 top-6 z-50 rounded-lg bg-red-50 px-4 py-3 text-sm font-bold text-red-600 shadow-[0_14px_34px_rgba(30,58,138,0.16)]">{authMessage}</div> : null}
       <div className="mx-auto flex h-full max-w-[1380px] items-center justify-between px-8">
         <Link href="/" className="group flex items-center gap-3">
           <Logo />
@@ -115,7 +121,7 @@ export function SiteFooter({ dark = true }: { dark?: boolean }) {
   const muted = dark ? "text-[#8d9bb6]" : "text-[#667693]";
   return (
     <footer className={bg}>
-      <div className="mx-auto grid max-w-[1380px] grid-cols-[320px_1fr_360px] gap-12 px-8 py-9">
+      <div className="mx-auto grid max-w-[1380px] grid-cols-1 gap-10 px-8 py-9 lg:grid-cols-[320px_1fr] xl:grid-cols-[320px_1fr_360px]">
         <div>
           <Link href="/" className="flex items-center gap-3">
             <Logo dark={!dark} />
@@ -124,7 +130,7 @@ export function SiteFooter({ dark = true }: { dark?: boolean }) {
           <p className={`mt-5 text-sm leading-7 ${muted}`}>一站式实用工具集合平台，帮助你更快完成视频、文档与 PDF 处理。</p>
           <p className={`mt-5 text-xs ${muted}`}>© 2024 灵析 · 让效率触手可及</p>
         </div>
-        <div className="grid grid-cols-3 gap-10">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-10">
           <FooterColumn title="产品" links={[["工具汇总", "/features"], ["视频工具", "/video-tools"], ["文档转换", "/document-convert"], ["PDF工具", "/pdf-tools"]]} muted={muted} />
           <FooterColumn title="支持" links={[["帮助中心", "/help-center"], ["使用教程", "/help-center"], ["常见问题", "/help-center"], ["更新日志", "/help-center"]]} muted={muted} />
           <FooterColumn title="关于我们" links={[["关于灵析", "/help-center"], ["联系我们", "/help-center"], ["用户协议", "/help-center"], ["隐私政策", "/help-center"]]} muted={muted} />

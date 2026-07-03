@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRight, ChevronDown, FileText, Grid2X2, LockKeyhole, MoreHorizontal, PlusCircle, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type DragEvent, type ReactNode } from "react";
 import { apiJson, downloadFile, formatBytes, type Job } from "@/lib/api";
 import { deleteJob, jobStatusClass, jobStatusText, useJobs } from "@/lib/useJobs";
 import { SiteHeader } from "../components/SiteHeader";
@@ -80,21 +80,35 @@ export default function PdfToolsPage() {
 }
 
 function ToolTabs({ selected, onSelect }: { selected: number; onSelect: (index: number) => void }) {
-  return <div className="flex h-[60px] items-center gap-2 overflow-x-auto rounded-xl border border-[#e2eaf5] bg-white px-3 shadow-[0_10px_28px_rgba(45,83,148,0.08)]">{tabs.map((tab, i) => <button key={tab[0]} onClick={() => onSelect(i)} className={`relative flex h-10 shrink-0 items-center gap-2 rounded-md px-4 text-sm font-bold ${i === selected ? "bg-[#eef4ff] text-[#176bff]" : "text-[#263451]"}`}>{i < 9 ? <FileText className="h-4 w-4" /> : <MoreHorizontal className="h-4 w-4" />}{tab[0]}{i === selected ? <span className="absolute -bottom-[10px] left-1/2 h-0 w-0 -translate-x-1/2 border-x-8 border-t-8 border-x-transparent border-t-[#eef4ff]" /> : null}</button>)}</div>;
+  return <div className="flex h-[60px] items-center gap-2 overflow-x-auto rounded-xl border border-[#e2eaf5] bg-white px-3 shadow-[0_10px_28px_rgba(45,83,148,0.08)]">{tabs.map((tab, i) => <button type="button" key={tab[0]} onClick={() => onSelect(i)} className={`relative flex h-10 shrink-0 items-center gap-2 rounded-md px-4 text-sm font-bold ${i === selected ? "bg-[#eef4ff] text-[#176bff]" : "text-[#263451]"}`}>{i < 9 ? <FileText className="h-4 w-4" /> : <MoreHorizontal className="h-4 w-4" />}{tab[0]}{i === selected ? <span className="absolute -bottom-[10px] left-1/2 h-0 w-0 -translate-x-1/2 border-x-8 border-t-8 border-x-transparent border-t-[#eef4ff]" /> : null}</button>)}</div>;
 }
 
 function UploadPanel({ file, onFile, selected, target, message, submitting, onStart }: { file: File | null; onFile: (file: File | null) => void; selected: string; target: string; message: string; submitting: boolean; onStart: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const dropped = event.dataTransfer.files?.[0] ?? null;
+    if (dropped) onFile(dropped);
+  }
   return (
     <section className="rounded-xl border border-[#e2eaf5] bg-white p-5 shadow-[0_12px_34px_rgba(45,83,148,0.08)]">
       <input ref={inputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={(event) => onFile(event.target.files?.[0] ?? null)} />
-      <div className="flex h-[238px] flex-col items-center justify-center rounded-xl border border-dashed border-[#b8cef2]">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => inputRef.current?.click()}
+        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") inputRef.current?.click(); }}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={handleDrop}
+        className="flex h-[238px] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-[#b8cef2] outline-none transition hover:border-[#176bff] focus:ring-4 focus:ring-blue-50"
+        aria-label="上传 PDF 文件"
+      >
         <div className="relative"><FileText className="h-16 w-16 text-[#b9cef5]" /><PlusCircle className="absolute bottom-0 right-0 h-7 w-7 fill-[#176bff] text-white" /></div>
         <div className="mt-4 text-[15px] font-black">点击或拖拽文件到此处上传</div>
         <div className="mt-2 text-sm text-[#667693]">{file ? file.name : "支持 PDF 格式，文件大小不超过 100MB"}</div>
         <div className="mt-5 flex gap-3">
-          <button onClick={() => inputRef.current?.click()} className="h-11 w-[150px] rounded-md bg-[#176bff] text-sm font-bold text-white shadow-[0_10px_24px_rgba(23,107,255,0.26)]">选择文件</button>
-          <button onClick={onStart} disabled={submitting} className="h-11 w-[150px] rounded-md border border-[#176bff] text-sm font-bold text-[#176bff] disabled:opacity-60">{submitting ? "提交中..." : "开始处理"}</button>
+          <button type="button" onClick={(event) => { event.stopPropagation(); inputRef.current?.click(); }} className="h-11 w-[150px] rounded-md bg-[#176bff] text-sm font-bold text-white shadow-[0_10px_24px_rgba(23,107,255,0.26)]">选择文件</button>
+          <button type="button" onClick={(event) => { event.stopPropagation(); onStart(); }} disabled={submitting} className="h-11 w-[150px] rounded-md border border-[#176bff] text-sm font-bold text-[#176bff] disabled:opacity-60">{submitting ? "提交中..." : "开始处理"}</button>
         </div>
         <div className="mt-4 text-sm text-[#9aa6ba]">当前工具：{selected}</div>
       </div>
@@ -109,11 +123,11 @@ function UploadPanel({ file, onFile, selected, target, message, submitting, onSt
 function TaskList({ jobs, loading, error, onRefresh }: { jobs: Job[]; loading: boolean; error: string; onRefresh: () => void }) {
   return (
     <section className="rounded-xl border border-[#e2eaf5] bg-white p-5 shadow-[0_12px_34px_rgba(45,83,148,0.08)]">
-      <div className="flex items-center justify-between"><h2 className="text-[18px] font-black">任务列表</h2><button onClick={onRefresh} className="rounded-md border border-[#dbe5f2] px-3 py-1 text-sm text-[#667693]"><RefreshCw className="mr-1 inline h-4 w-4" />刷新</button></div>
+      <div className="flex items-center justify-between"><h2 className="text-[18px] font-black">任务列表</h2><button type="button" onClick={onRefresh} className="rounded-md border border-[#dbe5f2] px-3 py-1 text-sm text-[#667693]"><RefreshCw className="mr-1 inline h-4 w-4" />刷新</button></div>
       <div className="mt-4 flex gap-8 border-b border-[#e5ebf5] text-sm font-bold text-[#667693]"><span className="border-b-2 border-[#176bff] pb-3 text-[#176bff]">全部任务</span><span>处理中</span><span>转换完成</span><span>转换失败</span></div>
       <div className="grid grid-cols-[1.4fr_0.8fr_0.55fr_1fr_1.1fr_0.7fr] border-b border-[#e5ebf5] px-3 py-3 text-sm text-[#667693]">{["文件名称", "工具", "大小", "状态", "创建时间", "操作"].map((h) => <span key={h}>{h}</span>)}</div>
       {error ? <EmptyState text={error} /> : loading ? <EmptyState text="正在读取真实任务..." /> : jobs.length ? jobs.map((job) => <TaskRow key={job.id} job={job} onRefresh={onRefresh} />) : <EmptyState text="暂无真实 PDF 任务" />}
-      <button onClick={onRefresh} className="mx-auto mt-4 flex w-fit items-center gap-2 text-sm font-bold text-[#176bff]">查看更多任务记录 <ArrowRight className="h-4 w-4" /></button>
+      <button type="button" onClick={onRefresh} className="mx-auto mt-4 flex w-fit items-center gap-2 text-sm font-bold text-[#176bff]">查看更多任务记录 <ArrowRight className="h-4 w-4" /></button>
     </section>
   );
 }
@@ -124,7 +138,7 @@ function GuidePanel() {
 }
 
 function QuickPanel({ onSelect }: { onSelect: (index: number) => void }) {
-  return <section className="rounded-xl border border-[#e2eaf5] bg-white p-5 shadow-[0_12px_34px_rgba(45,83,148,0.08)]"><h2 className="text-[18px] font-black">更多 PDF 快捷工具</h2><div className="mt-4 grid grid-cols-3 gap-2">{quickTools.map((tool, index) => <button key={tool} onClick={() => onSelect(index)} className="flex h-[78px] flex-col items-center justify-center rounded-lg border border-[#e5ebf5] text-center text-xs font-bold"><FileText className="mb-2 h-5 w-5 text-[#176bff]" />{tool}<span className="mt-1 text-[10px] font-normal text-[#667693]">快捷处理</span></button>)}</div><button onClick={() => onSelect(0)} className="mx-auto mt-4 flex w-fit items-center gap-2 text-sm font-bold text-[#176bff]">查看更多工具 <ArrowRight className="h-4 w-4" /></button></section>;
+  return <section className="rounded-xl border border-[#e2eaf5] bg-white p-5 shadow-[0_12px_34px_rgba(45,83,148,0.08)]"><h2 className="text-[18px] font-black">更多 PDF 快捷工具</h2><div className="mt-4 grid grid-cols-3 gap-2">{quickTools.map((tool, index) => <button type="button" key={tool} onClick={() => onSelect(index)} className="flex h-[78px] flex-col items-center justify-center rounded-lg border border-[#e5ebf5] text-center text-xs font-bold"><FileText className="mb-2 h-5 w-5 text-[#176bff]" />{tool}<span className="mt-1 text-[10px] font-normal text-[#667693]">快捷处理</span></button>)}</div><button type="button" onClick={() => onSelect(0)} className="mx-auto mt-4 flex w-fit items-center gap-2 text-sm font-bold text-[#176bff]">查看更多工具 <ArrowRight className="h-4 w-4" /></button></section>;
 }
 
 function TrustPanel() {
@@ -144,7 +158,7 @@ function TaskRow({ job, onRefresh }: { job: Job; onRefresh: () => void }) {
       <span>{formatBytes(job.input_file?.size_bytes)}</span>
       <span><span className={`rounded-full px-3 py-1 text-xs font-bold ${jobStatusClass(job.status)}`}>{jobStatusText(job.status)}</span></span>
       <span>{formatDate(job.created_at)}</span>
-      <button onClick={() => void handleAction()} className="flex gap-3 text-[#176bff]">{job.status === "SUCCEEDED" ? "下载文件" : "删除"}<Trash2 className="h-4 w-4 text-[#667693]" /></button>
+      <button type="button" onClick={() => void handleAction()} className="flex gap-3 text-[#176bff]">{job.status === "SUCCEEDED" ? "下载文件" : "删除"}<Trash2 className="h-4 w-4 text-[#667693]" /></button>
     </div>
   );
 }

@@ -62,7 +62,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="relative z-10 mt-8 grid grid-cols-6 gap-4">
+          <div className="relative z-10 mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             {tools.map((tool) => <ToolCard key={tool.title} tool={tool} />)}
           </div>
         </div>
@@ -74,7 +74,7 @@ export default function Home() {
             <h2 className="text-[26px] font-black tracking-normal">平台优势</h2>
             <p className="mt-2 text-sm text-[#6c7b96]">专业的技术团队，为您提供稳定、高效、安全的服务</p>
           </div>
-          <div className="mt-7 grid grid-cols-6 gap-5">
+          <div className="mt-7 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             {advantages.map((item) => <AdvantageCard key={item.title} item={item} />)}
           </div>
         </div>

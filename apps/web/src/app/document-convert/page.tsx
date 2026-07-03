@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDownToLine, ArrowRight, CheckCircle2, ChevronDown, Code2, FileText, Grid2X2, LockKeyhole, Settings, UploadCloud, UsersRound } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef, useState, type DragEvent } from "react";
 import { apiJson, downloadFile, formatBytes, type Job } from "@/lib/api";
 import { deleteJob, jobStatusClass, jobStatusText, useJobs } from "@/lib/useJobs";
 import { SiteHeader } from "../components/SiteHeader";
@@ -102,13 +102,26 @@ export default function DocumentConvertPage() {
 
 function UploadBox({ file, onFile }: { file: File | null; onFile: (file: File | null) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    onFile(event.dataTransfer.files?.[0] ?? null);
+  }
   return (
-    <div className="flex h-[190px] flex-col items-center justify-center rounded-xl border border-dashed border-[#b8cef2] bg-white">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => inputRef.current?.click()}
+      onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") inputRef.current?.click(); }}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={handleDrop}
+      className="flex h-[190px] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-[#b8cef2] bg-white outline-none transition hover:border-[#176bff] focus:ring-4 focus:ring-blue-50"
+      aria-label="上传文档文件"
+    >
       <input ref={inputRef} type="file" className="hidden" onChange={(event) => onFile(event.target.files?.[0] ?? null)} />
       <UploadCloud className="h-12 w-12 text-[#7ca2ec]" />
       <div className="mt-3 text-[15px] font-black">点击或拖拽文件到此处上传</div>
       <div className="mt-2 text-sm text-[#667693]">{file ? file.name : "支持 PDF、Word、Excel、PPT、HTML 等格式"}</div>
-      <button onClick={() => inputRef.current?.click()} className="mt-4 h-10 w-[138px] rounded-md bg-[#176bff] text-sm font-bold text-white shadow-[0_10px_24px_rgba(23,107,255,0.26)]">选择文件</button>
+      <button type="button" onClick={(event) => { event.stopPropagation(); inputRef.current?.click(); }} className="mt-4 h-10 w-[138px] rounded-md bg-[#176bff] text-sm font-bold text-white shadow-[0_10px_24px_rgba(23,107,255,0.26)]">选择文件</button>
     </div>
   );
 }
@@ -125,7 +138,7 @@ function SettingsPanel({ selectedName, targetFormat, onStart, submitting }: { se
       <div className="mt-5 text-sm font-bold">其他设置</div>
       <Check label="OCR 识别（识别图片中的文字）" />
       <Check checked label="合并所有页面为一个文件" />
-      <button onClick={onStart} disabled={submitting} className="mt-6 h-11 w-full rounded-lg bg-[#176bff] text-base font-black text-white shadow-[0_10px_24px_rgba(23,107,255,0.24)] disabled:opacity-60">{submitting ? "提交中..." : "开始转换"}</button>
+      <button type="button" onClick={onStart} disabled={submitting} className="mt-6 h-11 w-full rounded-lg bg-[#176bff] text-base font-black text-white shadow-[0_10px_24px_rgba(23,107,255,0.24)] disabled:opacity-60">{submitting ? "提交中..." : "开始转换"}</button>
     </aside>
   );
 }
@@ -133,9 +146,9 @@ function SettingsPanel({ selectedName, targetFormat, onStart, submitting }: { se
 function TaskPanel({ jobs, loading, error, onRefresh }: { jobs: Job[]; loading: boolean; error: string; onRefresh: () => void }) {
   return (
     <section className="rounded-xl border border-[#e2eaf5] bg-white p-4 shadow-[0_12px_30px_rgba(45,83,148,0.08)]">
-      <div className="flex items-center justify-between"><h2 className="text-[17px] font-black">转换任务进度</h2><button onClick={onRefresh} className="text-sm font-bold text-[#176bff]">刷新</button></div>
+      <div className="flex items-center justify-between"><h2 className="text-[17px] font-black">转换任务进度</h2><button type="button" onClick={onRefresh} className="text-sm font-bold text-[#176bff]">刷新</button></div>
       <div className="mt-3 space-y-2">{error ? <EmptyState text={error} /> : loading ? <EmptyState text="正在读取真实任务..." /> : jobs.length ? jobs.map((job) => <TaskRow key={job.id} job={job} onRefresh={onRefresh} />) : <EmptyState text="暂无真实转换任务" />}</div>
-      <button onClick={onRefresh} className="mx-auto mt-4 flex w-fit items-center gap-2 text-sm font-bold text-[#176bff]">查看全部任务 <ArrowRight className="h-4 w-4" /></button>
+      <button type="button" onClick={onRefresh} className="mx-auto mt-4 flex w-fit items-center gap-2 text-sm font-bold text-[#176bff]">查看全部任务 <ArrowRight className="h-4 w-4" /></button>
     </section>
   );
 }
@@ -150,7 +163,7 @@ function RecentPanel({ jobs, loading, error }: { jobs: Job[]; loading: boolean; 
 }
 
 function ToolButton({ tool, active, onClick }: { tool: (typeof commonTools)[number]; active?: boolean; onClick: () => void }) {
-  return <button onClick={onClick} className={`flex h-[50px] items-center justify-center gap-2 rounded-md border text-xs font-black ${active ? "border-[#176bff] text-[#176bff]" : "border-[#e2eaf5] text-[#1d2945]"}`}><DocIcon type={tool[2]} tone={tool[3]} />{tool[0]}</button>;
+  return <button type="button" onClick={onClick} className={`flex h-[50px] items-center justify-center gap-2 rounded-md border text-xs font-black ${active ? "border-[#176bff] text-[#176bff]" : "border-[#e2eaf5] text-[#1d2945]"}`}><DocIcon type={tool[2]} tone={tool[3]} />{tool[0]}</button>;
 }
 
 function TaskRow({ job, onRefresh }: { job: Job; onRefresh: () => void }) {
@@ -165,7 +178,7 @@ function TaskRow({ job, onRefresh }: { job: Job; onRefresh: () => void }) {
       <span>{formatBytes(job.input_file?.size_bytes)}</span>
       <span><span className={`rounded-full px-3 py-1 text-xs font-bold ${jobStatusClass(job.status)}`}>{jobStatusText(job.status)}</span></span>
       <span>{formatDate(job.created_at)}</span>
-      <button onClick={() => void handleAction()} className="justify-self-end rounded-md border border-[#dfe7f3] px-3 py-1 text-[#176bff]">{job.status === "SUCCEEDED" ? "下载" : "删除"}</button>
+      <button type="button" onClick={() => void handleAction()} className="justify-self-end rounded-md border border-[#dfe7f3] px-3 py-1 text-[#176bff]">{job.status === "SUCCEEDED" ? "下载" : "删除"}</button>
     </div>
   );
 }
