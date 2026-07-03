@@ -664,6 +664,22 @@ async def patch_config(payload: SingleConfigPayload):
     return await get_config()
 
 
+@router.delete("/config/{name}")
+async def delete_config(name: str):
+    custom_fields = await get_custom_fields()
+    custom_keys = {field.get("key") for field in custom_fields}
+    if name not in CONFIG_FIELD_MAP and name not in custom_keys:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Config key not found")
+
+    row = await db.appsetting.find_unique(where={"key": name})
+    if row:
+        await db.appsetting.delete(where={"key": name})
+
+    if name in custom_keys:
+        await save_custom_fields([field for field in custom_fields if field.get("key") != name])
+    return await get_config()
+
+
 @router.post("/config/custom")
 async def create_custom_config(payload: CustomConfigPayload):
     key = payload.key.strip()

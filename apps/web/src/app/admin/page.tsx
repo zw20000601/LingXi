@@ -602,7 +602,16 @@ function ApiPanel({ config: initialConfig, onSaved, onAction }: { config: ApiCon
               <div className="ml-8 flex items-center gap-5 border-l border-[#e4ebf6] pl-8">
                 <IconButton label="编辑" icon={Pencil} onClick={() => setEditing(item.id)} />
                 <IconButton label="测试" icon={Rocket} onClick={() => void testConfig(item.name, item.id)} />
-                <IconButton label="删除" icon={Trash2} danger onClick={() => { void patchConfig(item.id, "").then(() => onAction(`${item.name}已删除或清空`)).catch((err) => onAction(err instanceof Error ? err.message : "删除失败")); }} />
+                <IconButton label="删除" icon={Trash2} danger onClick={() => {
+                  void apiJson<ApiConfig>(`/api/admin/config/${encodeURIComponent(item.id)}`, { method: "DELETE" })
+                    .then((saved) => {
+                      const next = { ...defaultApiConfig, ...saved };
+                      setConfig(next);
+                      onSaved(next);
+                      onAction(`${item.name}已删除`);
+                    })
+                    .catch((err) => onAction(err instanceof Error ? err.message : "删除失败"));
+                }} />
               </div>
             </section>
           );
