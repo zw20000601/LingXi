@@ -19,6 +19,8 @@ async def current_user(credentials: HTTPAuthorizationCredentials | None = Depend
     user = await db.user.find_unique(where={"id": user_id})
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    if bool(getattr(user, "is_disabled", False)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled")
 
     return user
 

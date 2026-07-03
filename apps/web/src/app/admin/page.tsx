@@ -57,12 +57,16 @@ type AdminDashboard = {
   trend: Array<{ date: string; requests: number }>;
   moduleShares: Array<{ name: string; value: number }>;
   recentActivities: Array<{ time: string; module: string; action: string; status: string }>;
-  recentUsers: Array<{ email: string; membershipStatus: string; createdAt: string }>;
+  functionRank?: Array<{ name: string; type: string; count: number; share: number }>;
+  recentUsers: Array<{ id: string; email: string; username?: string; membershipStatus: string; isDisabled?: boolean; createdAt: string }>;
   apiOverview: { configured: number; total: number; updatedAt: string };
-  announcements: Array<{ title: string; time: string; status?: string }>;
+  announcements: Array<Notice>;
 };
 
+type TrendRange = "近一天" | "近7天" | "近一个月";
+
 type ApiConfig = {
+  [key: string]: string | CustomConfigField[] | undefined;
   contentApiKey: string;
   speechApiKey: string;
   copyExtractApiKey: string;
@@ -75,15 +79,26 @@ type ApiConfig = {
   smtpSecure: string;
   smtpFromName: string;
   updatedAt: string;
+  customFields?: CustomConfigField[];
+};
+
+type CustomConfigField = {
+  key: string;
+  label: string;
+  group: string;
+  secret?: boolean;
+  placeholder?: string;
+  description?: string;
 };
 
 type CardSecret = {
   id: string;
   code: string;
-  type: "月卡" | "季卡" | "年卡" | "体验卡";
-  quota: string;
-  status: "未使用" | "已使用" | "已过期";
-  user: string;
+  type: string;
+  quota: number;
+  validDays: number;
+  status: "UNUSED" | "USED" | "EXPIRED";
+  usedBy: string;
   createdAt: string;
   expiresAt: string;
 };
@@ -92,25 +107,28 @@ type ManagedUser = {
   id: string;
   username: string;
   email: string;
-  status: "正常" | "已禁用";
+  isDisabled: boolean;
   createdAt: string;
+  membershipStatus?: string;
 };
 
 type Notice = {
   id: string;
   title: string;
   type: "系统通知" | "重要通知" | "功能更新" | "使用指南";
-  status: "已发布" | "草稿";
+  status: "PUBLISHED" | "DRAFT";
+  content: string;
   time: string;
 };
 
 type ApiItem = {
-  id: keyof ApiConfig;
+  id: string;
   name: string;
   endpoint: string;
   limit: string;
   icon: ComponentType<{ className?: string }>;
   accent: string;
+  custom?: boolean;
 };
 
 const emptyDashboard: AdminDashboard = {
@@ -147,40 +165,37 @@ const navItems: NavItem[] = [
 ];
 
 const initialCards: CardSecret[] = [
-  { id: "1", code: "LK20240520001", type: "月卡", quota: "100 次", status: "未使用", user: "-", createdAt: "2024-05-20 09:00:00", expiresAt: "2024-06-20 09:00:00" },
-  { id: "2", code: "LK20240520002", type: "季卡", quota: "300 次", status: "未使用", user: "-", createdAt: "2024-05-20 09:00:00", expiresAt: "2024-08-20 09:00:00" },
-  { id: "3", code: "LK20240520003", type: "年卡", quota: "1200 次", status: "已使用", user: "用户1234", createdAt: "2024-05-18 15:20:15", expiresAt: "2025-05-18 15:20:15" },
-  { id: "4", code: "LK20240520004", type: "体验卡", quota: "10 次", status: "已过期", user: "用户2345", createdAt: "2024-04-20 10:30:30", expiresAt: "2024-04-27 10:30:30" },
 ];
 
 const initialNotices: Notice[] = [
-  { id: "1", title: "平台维护通知", type: "系统通知", status: "已发布", time: "2024-05-20 10:30:45" },
-  { id: "2", title: "关于 API 接口调整的通知", type: "重要通知", status: "已发布", time: "2024-05-19 12:03:08" },
-  { id: "3", title: "新功能上线：PDF 合并", type: "功能更新", status: "已发布", time: "2024-05-18 16:45:12" },
-  { id: "4", title: "使用指南：新手教程", type: "使用指南", status: "草稿", time: "2024-05-17 09:15:33" },
 ];
 
 const apiItems: ApiItem[] = [
-  { id: "copyExtractApiKey", name: "视频提取 API", endpoint: "https://api.lingxi.com/video/extract", limit: "1000 次/分钟", icon: Rocket, accent: "blue" },
-  { id: "contentApiKey", name: "文档转换 API", endpoint: "https://api.lingxi.com/doc/convert", limit: "2000 次/分钟", icon: FileText, accent: "green" },
-  { id: "speechApiKey", name: "语音转写 API", endpoint: "https://api.lingxi.com/audio/transcribe", limit: "800 次/分钟", icon: Activity, accent: "violet" },
+  { id: "videoParseApiKey", name: "视频解析 API", endpoint: "videoParseApiBaseUrl", limit: "对应前端短视频提取、视频提取文案", icon: Rocket, accent: "blue" },
+  { id: "contentApiKey", name: "文档转换 API", endpoint: "contentApiBaseUrl", limit: "对应前端 DOC/PDF/文案处理", icon: FileText, accent: "green" },
+  { id: "speechApiKey", name: "语音转写 API", endpoint: "speechApiBaseUrl", limit: "对应前端音视频转文字", icon: Activity, accent: "violet" },
+  { id: "imageApiKey", name: "图片生成 API", endpoint: "imageApiBaseUrl", limit: "对应前端图片/AI 绘图能力", icon: FileText, accent: "cyan" },
   { id: "smtpPassword", name: "注册邮件 SMTP", endpoint: "smtp.qq.com:465", limit: "按邮箱服务商限制", icon: Send, accent: "orange" },
 ];
 
+const API_PRESETS = [
+  { label: "视频解析 API", key: "videoParseApiKey", endpointKey: "videoParseApiBaseUrl", group: "video", placeholder: "https://..." },
+  { label: "文档转换 API", key: "contentApiKey", endpointKey: "contentApiBaseUrl", group: "content", placeholder: "https://api.openai.com/v1" },
+  { label: "语音转写 API", key: "speechApiKey", endpointKey: "speechApiBaseUrl", group: "speech", placeholder: "https://api.openai.com/v1" },
+  { label: "图片生成 API", key: "imageApiKey", endpointKey: "imageApiBaseUrl", group: "image", placeholder: "https://api.openai.com/v1" },
+  { label: "注册邮件 SMTP", key: "smtpPassword", endpointKey: "smtpHost", group: "mail", placeholder: "smtp.qq.com" },
+  { label: "自定义功能 API", key: "custom", endpointKey: "", group: "custom", placeholder: "https://..." },
+] as const;
+
 function makeUsers(recent: AdminDashboard["recentUsers"]): ManagedUser[] {
   const fromData = recent.map((user, index) => ({
-    id: `${100001 + index}`,
-    username: user.email.split("@")[0],
+    id: user.id || `${100001 + index}`,
+    username: user.username || user.email.split("@")[0],
     email: user.email,
-    status: "正常" as const,
+    isDisabled: Boolean(user.isDisabled),
     createdAt: formatDateTime(user.createdAt),
   }));
-  if (fromData.length) return fromData;
-  return [
-    { id: "100001", username: "admin", email: "1781586305@qq.com", status: "正常", createdAt: "2024-05-19 10:23:45" },
-    { id: "100002", username: "api_user", email: "api_user@qq.com", status: "正常", createdAt: "2024-05-15 14:20:18" },
-    { id: "100003", username: "guest_001", email: "guest001@qq.com", status: "已禁用", createdAt: "2024-05-11 21:33:12" },
-  ];
+  return fromData;
 }
 
 export default function AdminPage() {
@@ -196,9 +211,13 @@ export default function AdminPage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [globalQuery, setGlobalQuery] = useState("");
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [adminAvatar, setAdminAvatar] = useState("");
 
   useEffect(() => {
     setAuthenticated(Boolean(getToken()));
+    setAdminAvatar(window.localStorage.getItem("lingxi_admin_avatar") ?? "");
     setAuthChecked(true);
   }, []);
 
@@ -213,14 +232,19 @@ export default function AdminPage() {
       setLoading(true);
       setLoadError("");
       try {
-        const [dashboardData, configData] = await Promise.all([
+        const [dashboardData, configData, usersData, cardsData, noticesData] = await Promise.all([
           apiJson<AdminDashboard>("/api/admin/dashboard"),
           apiJson<ApiConfig>("/api/admin/config"),
+          apiJson<ManagedUser[]>("/api/admin/users"),
+          apiJson<CardSecret[]>("/api/admin/cards"),
+          apiJson<Notice[]>("/api/admin/announcements"),
         ]);
         if (!cancelled) {
           setDashboard(dashboardData);
           setApiConfig({ ...defaultApiConfig, ...configData });
-          setUsers(makeUsers(dashboardData.recentUsers));
+          setUsers(usersData.length ? usersData.map((user) => ({ ...user, createdAt: formatDateTime(user.createdAt) })) : makeUsers(dashboardData.recentUsers));
+          setCards(cardsData);
+          setNotices(noticesData.map((notice) => ({ ...notice, time: formatDateTime(notice.time || "") })));
         }
       } catch (err) {
         if (!cancelled) {
@@ -304,11 +328,34 @@ export default function AdminPage() {
               <Bell className="h-5 w-5" />
               <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[#176bff]" />
             </button>
-            <button type="button" onClick={handleLogout} className="flex items-center gap-3 rounded-lg px-2 py-1 transition hover:bg-[#eef5ff]" title="退出登录">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#eef3fb] text-sm font-black">管</div>
-              <span className="font-bold text-[#33415f]">管理员</span>
-              <ChevronDown className="h-4 w-4 text-[#7b88a4]" />
-            </button>
+            <div className="relative">
+              <div className="flex items-center gap-2 rounded-lg px-2 py-1 transition hover:bg-[#eef5ff]">
+                <label className="flex h-11 w-11 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-[#eef3fb] text-sm font-black">
+                  {adminAvatar ? <img src={adminAvatar} alt="管理员头像" className="h-full w-full object-cover" /> : "管"}
+                  <input type="file" accept="image/*" className="hidden" onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      const value = String(reader.result || "");
+                      setAdminAvatar(value);
+                      window.localStorage.setItem("lingxi_admin_avatar", value);
+                      notify("管理员头像已更新");
+                    };
+                    reader.readAsDataURL(file);
+                  }} />
+                </label>
+                <span className="font-bold text-[#33415f]">管理员</span>
+                <button type="button" onClick={() => setAdminMenuOpen((value) => !value)} className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-white"><ChevronDown className="h-4 w-4 text-[#7b88a4]" /></button>
+              </div>
+              {adminMenuOpen ? (
+                <div className="absolute right-0 top-[54px] w-44 overflow-hidden rounded-lg border border-[#e3ebf6] bg-white py-2 shadow-[0_18px_42px_rgba(39,76,135,0.16)]">
+                  <button type="button" onClick={() => { setPasswordModalOpen(true); setAdminMenuOpen(false); }} className="block w-full px-4 py-2 text-left text-sm font-bold text-[#53617d] hover:bg-[#f8fbff] hover:text-[#176bff]">修改密码</button>
+                  <button type="button" onClick={() => notify("操作日志模块后续可接入审计表")} className="block w-full px-4 py-2 text-left text-sm font-bold text-[#53617d] hover:bg-[#f8fbff] hover:text-[#176bff]">操作日志</button>
+                  <button type="button" onClick={handleLogout} className="block w-full px-4 py-2 text-left text-sm font-bold text-red-500 hover:bg-red-50">退出登录</button>
+                </div>
+              ) : null}
+            </div>
           </div>
         </header>
 
@@ -323,6 +370,7 @@ export default function AdminPage() {
       </section>
 
       {toast ? <div className="fixed bottom-6 right-6 z-50 rounded-lg bg-[#101936] px-5 py-3 text-sm font-bold text-white shadow-[0_18px_40px_rgba(16,25,54,0.22)]">{toast}</div> : null}
+      {passwordModalOpen ? <PasswordModal onClose={() => setPasswordModalOpen(false)} onAction={notify} /> : null}
     </main>
   );
 }
@@ -376,29 +424,34 @@ function AdminLoginPanel({ onLogin }: { onLogin: () => void }) {
 }
 
 function DashboardPanel({ data, loading, onAction }: { data: AdminDashboard; loading: boolean; onAction: (message: string) => void }) {
+  const [range, setRange] = useState<TrendRange>("近7天");
+  const rangeSize = range === "近一天" ? 1 : range === "近一个月" ? 30 : 7;
+  const trendRows = data.trend.slice(-rangeSize);
   const totalRequests = data.trend.reduce((sum, item) => sum + item.requests, 0);
   const stats = [
-    { label: "总用户数", value: data.stats.totalUsers || 12856, delta: "+12.5%", icon: UserRound, tone: "blue" },
-    { label: "今日请求数", value: data.stats.todayRequests || 58265, delta: "+18.2%", icon: Activity, tone: "violet" },
-    { label: "总请求次数", value: totalRequests || 1285632, delta: "+15.3%", icon: Clipboard, tone: "cyan" },
-    { label: "API成功率", value: `${data.stats.apiSuccessRate || 100}%`, delta: "-3.2%", icon: ShieldCheck, tone: "green" },
+    { label: "总用户数", value: data.stats.totalUsers, sub: `今日新增 ${data.stats.newUsersToday}`, icon: UserRound, tone: "blue" },
+    { label: "今日请求数", value: data.stats.todayRequests, sub: `昨日 ${data.stats.yesterdayRequests}`, icon: Activity, tone: "violet" },
+    { label: "总请求次数", value: totalRequests, sub: "来自真实任务表", icon: Clipboard, tone: "cyan" },
+    { label: "API成功率", value: `${data.stats.apiSuccessRate}%`, sub: "基于真实任务状态", icon: ShieldCheck, tone: "green" },
   ];
   return (
     <div className="space-y-6">
       <PageTitle title="数据看板" desc="实时查看平台整体数据概览" action={<button type="button" onClick={() => onAction("数据已刷新")} className="admin-secondary"><RefreshCw className="h-4 w-4" />刷新数据</button>} />
       <div className="grid grid-cols-4 gap-6">{stats.map((item) => <MetricCard key={item.label} {...item} />)}</div>
       <div className="grid grid-cols-[1.45fr_1fr] gap-6">
-        <Panel title="请求趋势" action={<button type="button" onClick={() => onAction("已切换到近7天")} className="admin-filter">近7天 <ChevronDown className="h-4 w-4" /></button>}>
-          <TrendChart data={data.trend} loading={loading} />
+        <Panel title="请求趋势" action={<SelectBox value={range} onChange={(value) => setRange(value as TrendRange)} options={["近一天", "近7天", "近一个月"]} />}>
+          <TrendChart data={trendRows} loading={loading} />
         </Panel>
         <Panel title="请求来源分布">
-          <DonutPanel data={data.moduleShares.length ? data.moduleShares : [{ name: "网页版", value: 46 }, { name: "API调用", value: 28 }, { name: "移动端", value: 15 }, { name: "其他", value: 11 }]} />
+          {data.moduleShares.length ? <DonutPanel data={data.moduleShares} /> : <EmptyState text="暂无真实请求来源数据" />}
         </Panel>
       </div>
       <Panel title="功能使用排行" action={<button type="button" onClick={() => onAction("已展开全部排行")} className="text-sm font-black text-[#176bff]">查看全部</button>}>
-        <div className="grid grid-cols-5 gap-5">
-          {["智能创作", "PDF转换", "文档问答", "PDF合并", "数据查询"].map((name, index) => <RankCard key={name} rank={index + 1} name={name} />)}
-        </div>
+        {data.functionRank?.length ? (
+          <div className="grid grid-cols-5 gap-5">
+            {data.functionRank.map((item, index) => <RankCard key={item.type} rank={index + 1} name={item.name} count={item.count} share={item.share} />)}
+          </div>
+        ) : <EmptyState text="暂无真实功能使用数据" />}
       </Panel>
     </div>
   );
@@ -408,39 +461,40 @@ function CardsPanel({ cards, setCards, onAction }: { cards: CardSecret[]; setCar
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("全部状态");
   const [type, setType] = useState("全部类型");
-  const filtered = cards.filter((card) => (status === "全部状态" || card.status === status) && (type === "全部类型" || card.type === type) && card.code.toLowerCase().includes(query.toLowerCase()));
-  function generateCard() {
-    const id = `${Date.now()}`;
-    const next: CardSecret = { id, code: `LK${new Date().toISOString().slice(0, 10).replaceAll("-", "")}${String(cards.length + 1).padStart(4, "0")}`, type: "月卡", quota: "100 次", status: "未使用", user: "-", createdAt: nowText(), expiresAt: "30 天后" };
-    setCards([next, ...cards]);
-    onAction("已生成 1 张月卡");
+  const [generateOpen, setGenerateOpen] = useState(false);
+  const filtered = cards.filter((card) => (status === "全部状态" || cardStatusLabel(card.status) === status) && (type === "全部类型" || card.type === type) && card.code.toLowerCase().includes(query.toLowerCase()));
+  async function deleteCard(id: string) {
+    await apiJson(`/api/admin/cards/${id}`, { method: "DELETE" });
+    setCards(cards.filter((item) => item.id !== id));
+    onAction("卡密已删除");
   }
   return (
     <div className="space-y-6">
-      <PageTitle title="卡密管理" desc="管理平台卡密，支持生成、查询、导出与操作" action={<div className="flex gap-3"><button type="button" onClick={() => exportCsv("lingxi-cards.csv", cards)} className="admin-secondary"><Download className="h-4 w-4" />导出记录</button><button type="button" onClick={generateCard} className="admin-primary"><Plus className="h-4 w-4" />生成卡密</button></div>} />
+      <PageTitle title="卡密管理" desc="管理平台卡密，支持生成、查询、导出与操作" action={<div className="flex gap-3"><button type="button" onClick={() => exportCsv("lingxi-cards.csv", cards.map((card) => ({ code: card.code, type: card.type, quota: card.quota, validDays: card.validDays, status: cardStatusLabel(card.status), usedBy: card.usedBy, createdAt: formatDateTime(card.createdAt), expiresAt: formatDateTime(card.expiresAt) })))} className="admin-secondary"><Download className="h-4 w-4" />导出记录</button><button type="button" onClick={() => setGenerateOpen(true)} className="admin-primary"><Plus className="h-4 w-4" />生成卡密</button></div>} />
       <div className="grid grid-cols-4 gap-5">
         <SummaryCard icon={CreditCard} label="卡密总数" value={cards.length} tone="blue" />
-        <SummaryCard icon={FileText} label="未使用" value={cards.filter((card) => card.status === "未使用").length} tone="slate" />
-        <SummaryCard icon={Check} label="已使用" value={cards.filter((card) => card.status === "已使用").length} tone="green" />
-        <SummaryCard icon={RefreshCw} label="已过期" value={cards.filter((card) => card.status === "已过期").length} tone="red" />
+        <SummaryCard icon={FileText} label="未使用" value={cards.filter((card) => card.status === "UNUSED").length} tone="slate" />
+        <SummaryCard icon={Check} label="已使用" value={cards.filter((card) => card.status === "USED").length} tone="green" />
+        <SummaryCard icon={RefreshCw} label="已过期" value={cards.filter((card) => card.status === "EXPIRED").length} tone="red" />
       </div>
       <FilterBar>
         <SearchBox value={query} onChange={setQuery} placeholder="请输入卡密或备注" />
         <SelectBox value={status} onChange={setStatus} options={["全部状态", "未使用", "已使用", "已过期"]} />
-        <SelectBox value={type} onChange={setType} options={["全部类型", "月卡", "季卡", "年卡", "体验卡"]} />
+        <SelectBox value={type} onChange={setType} options={["全部类型", "日卡", "周卡", "月卡", "季卡", "年卡", "体验卡"]} />
         <button type="button" onClick={() => onAction(`查询到 ${filtered.length} 条卡密`)} className="admin-primary ml-auto">查询</button>
       </FilterBar>
       <Panel title="">
         <AdminTable headers={["卡密", "类型", "面值 / 次数", "状态", "使用人", "创建时间", "过期时间", "操作"]}>
           {filtered.map((card) => (
             <tr key={card.id} className="admin-tr">
-              <td>{card.code}</td><td>{card.type}</td><td>{card.quota}</td><td><StatusBadge value={card.status} /></td><td>{card.user}</td><td>{card.createdAt}</td><td>{card.expiresAt}</td>
-              <td><ActionGroup actions={[["详情", () => onAction(`卡密 ${card.code}：${card.status}`)], ["复制", () => copyText(card.code, onAction)], ["删除", () => setCards(cards.filter((item) => item.id !== card.id))]]} /></td>
+              <td>{card.code}</td><td>{card.type}</td><td>{card.quota} 次</td><td><StatusBadge value={cardStatusLabel(card.status)} /></td><td>{card.usedBy || "-"}</td><td>{formatDateTime(card.createdAt)}</td><td>{formatDateTime(card.expiresAt)}</td>
+              <td><ActionGroup actions={[["详情", () => onAction(`卡密 ${card.code}：${cardStatusLabel(card.status)}`)], ["复制", () => copyText(card.code, onAction)], ["删除", () => void deleteCard(card.id)]]} /></td>
             </tr>
           ))}
         </AdminTable>
         <Pagination total={filtered.length} pageSize="30 条/页" />
       </Panel>
+      {generateOpen ? <GenerateCardModal onClose={() => setGenerateOpen(false)} onCreated={(created) => { setCards([...created, ...cards]); setGenerateOpen(false); onAction(`已生成 ${created.length} 张卡密`); }} /> : null}
     </div>
   );
 }
@@ -448,14 +502,21 @@ function CardsPanel({ cards, setCards, onAction }: { cards: CardSecret[]; setCar
 function UsersPanel({ users, setUsers, query, onAction }: { users: ManagedUser[]; setUsers: (users: ManagedUser[]) => void; query: string; onAction: (message: string) => void }) {
   const [localQuery, setLocalQuery] = useState("");
   const [status, setStatus] = useState("全部状态");
+  const [viewing, setViewing] = useState<ManagedUser | null>(null);
   const keyword = (localQuery || query).toLowerCase();
-  const filtered = users.filter((user) => (status === "全部状态" || user.status === status) && [user.id, user.username, user.email].some((value) => value.toLowerCase().includes(keyword)));
-  function toggleUser(id: string) {
-    setUsers(users.map((user) => user.id === id ? { ...user, status: user.status === "正常" ? "已禁用" : "正常" } : user));
+  const filtered = users.filter((user) => (status === "全部状态" || (user.isDisabled ? "已禁用" : "正常") === status) && [user.id, user.username, user.email].some((value) => value.toLowerCase().includes(keyword)));
+  async function toggleUser(user: ManagedUser) {
+    const updated = await apiJson<ManagedUser>(`/api/admin/users/${user.id}/status`, { method: "PATCH", body: JSON.stringify({ is_disabled: !user.isDisabled }) });
+    setUsers(users.map((item) => item.id === user.id ? { ...item, isDisabled: updated.isDisabled } : item));
+    onAction(updated.isDisabled ? "用户已禁用，将被强制退出" : "用户已启用");
+  }
+  async function resetPassword(user: ManagedUser) {
+    const result = await apiJson<{ temporaryPassword: string }>(`/api/admin/users/${user.id}/reset-password`, { method: "POST" });
+    copyText(result.temporaryPassword, onAction, "密码已重置为 123456789，并已复制");
   }
   return (
     <div className="space-y-6">
-      <PageTitle title="用户管理" desc="管理平台注册账号，查看用户信息与使用状态" action={<button type="button" onClick={() => exportCsv("lingxi-users.csv", users)} className="admin-secondary"><Download className="h-4 w-4" />导出用户</button>} />
+      <PageTitle title="用户管理" desc="管理平台注册账号，查看用户信息与使用状态" action={<button type="button" onClick={() => exportCsv("lingxi-users.csv", users.map((user) => ({ id: user.id, username: user.username, email: user.email, status: user.isDisabled ? "已禁用" : "正常", membershipStatus: user.membershipStatus || "FREE", createdAt: user.createdAt })))} className="admin-secondary"><Download className="h-4 w-4" />导出用户</button>} />
       <FilterBar>
         <SearchBox value={localQuery} onChange={setLocalQuery} placeholder="请输入用户名或邮箱" />
         <SelectBox value={status} onChange={setStatus} options={["全部状态", "正常", "已禁用"]} />
@@ -465,25 +526,46 @@ function UsersPanel({ users, setUsers, query, onAction }: { users: ManagedUser[]
         <AdminTable headers={["用户ID", "用户名", "邮箱", "状态", "注册时间", "操作"]}>
           {filtered.map((user) => (
             <tr key={user.id} className="admin-tr">
-              <td>{user.id}</td><td>{user.username}</td><td>{user.email}</td><td><StatusBadge value={user.status} /></td><td>{user.createdAt}</td>
-              <td><ActionGroup actions={[["查看", () => onAction(`${user.email} 注册于 ${user.createdAt}`)], ["重置密码", () => copyText("Lingxi@123456", onAction, "临时密码已复制")], [user.status === "正常" ? "禁用" : "启用", () => toggleUser(user.id)]]} /></td>
+              <td>{user.id}</td><td>{user.username}</td><td>{user.email}</td><td><StatusBadge value={user.isDisabled ? "已禁用" : "正常"} /></td><td>{user.createdAt}</td>
+              <td><ActionGroup actions={[["查看", () => setViewing(user)], ["重置密码", () => void resetPassword(user)], [user.isDisabled ? "启用" : "禁用", () => void toggleUser(user)]]} /></td>
             </tr>
           ))}
         </AdminTable>
         <Pagination total={filtered.length} pageSize="10 条/页" />
       </Panel>
+      {viewing ? <UserDetailModal user={viewing} onClose={() => setViewing(null)} /> : null}
     </div>
   );
 }
 
 function ApiPanel({ config: initialConfig, onSaved, onAction }: { config: ApiConfig; onSaved: (config: ApiConfig) => void; onAction: (message: string) => void }) {
   const [config, setConfig] = useState<ApiConfig>(initialConfig);
-  const [editing, setEditing] = useState<keyof ApiConfig | "smtp" | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [customOpen, setCustomOpen] = useState(false);
   const [visible, setVisible] = useState<Record<string, boolean>>({});
   useEffect(() => setConfig(initialConfig), [initialConfig]);
+  const allApiItems: ApiItem[] = [
+    ...apiItems,
+    ...((config.customFields as CustomConfigField[] | undefined) ?? []).map((field) => ({
+      id: field.key,
+      name: field.label,
+      endpoint: field.placeholder || "自定义配置",
+      limit: field.group,
+      icon: Code2,
+      accent: "slate",
+      custom: true,
+    })),
+  ];
+  async function patchConfig(key: string, value: string) {
+    const saved = await apiJson<ApiConfig>("/api/admin/config", { method: "PATCH", body: JSON.stringify({ key, value }) });
+    const next = { ...defaultApiConfig, ...saved };
+    setConfig(next);
+    onSaved(next);
+    return next;
+  }
   async function saveConfig(label = "配置") {
     try {
-      const saved = await apiJson<ApiConfig>("/api/admin/config", { method: "PUT", body: JSON.stringify(stripUpdatedAt(config)) });
+      const saved = await apiJson<ApiConfig>("/api/admin/config", { method: "PUT", body: JSON.stringify(stripBuiltInConfig(config)) });
       const next = { ...defaultApiConfig, ...saved };
       setConfig(next);
       onSaved(next);
@@ -492,7 +574,7 @@ function ApiPanel({ config: initialConfig, onSaved, onAction }: { config: ApiCon
       onAction(err instanceof Error ? err.message : `${label}保存失败`);
     }
   }
-  async function testConfig(label: string, key: keyof ApiConfig) {
+  async function testConfig(label: string, key: string) {
     try {
       const result = await apiJson<{ ok: boolean; message: string }>(`/api/admin/config/test/${String(key)}`, { method: "POST" });
       onAction(`${label}：${result.message}`);
@@ -502,24 +584,25 @@ function ApiPanel({ config: initialConfig, onSaved, onAction }: { config: ApiCon
   }
   return (
     <div className="space-y-6">
-      <PageTitle title="API配置" desc="管理系统对接的第三方 API 接口配置，支持新增、编辑、测试与删除。" action={<button type="button" onClick={() => setEditing("contentApiKey")} className="admin-primary"><Plus className="h-4 w-4" />新增配置</button>} />
+      <PageTitle title="API配置" desc="管理系统对接的第三方 API 接口配置，支持新增、编辑、测试与删除。" action={<button type="button" onClick={() => setCustomOpen(true)} className="admin-primary"><Plus className="h-4 w-4" />新增配置</button>} />
       <div className="space-y-4">
-        {apiItems.map((item) => {
+        {allApiItems.map((item) => {
           const Icon = item.icon;
-          const configured = Boolean(config[item.id]);
+          const configured = Boolean(String(config[item.id] ?? ""));
+          const endpoint = item.endpoint.endsWith("BaseUrl") || item.endpoint === "smtpHost" ? String(config[item.endpoint] || item.endpoint) : item.endpoint;
           return (
             <section key={item.id} className="flex min-h-[150px] items-center rounded-xl border border-[#e3ebf6] bg-white p-6 shadow-[0_14px_36px_rgba(39,76,135,0.08)]">
               <div className={`mr-6 flex h-24 w-24 items-center justify-center rounded-xl border bg-[#f8fbff] ${accentText(item.accent)}`}><Icon className="h-10 w-10" /></div>
               <div className="min-w-0 flex-1 border-l border-[#e4ebf6] pl-6">
                 <div className="flex items-center gap-3"><h3 className="text-lg font-black">{item.name}</h3><StatusBadge value={configured ? "已启用" : "未配置"} /></div>
-                <InfoRow label="接口地址" value={item.endpoint} link />
+                <InfoRow label="接口地址" value={endpoint || "未配置"} link />
                 <InfoRow label="请求限制" value={item.limit} />
                 <InfoRow label="更新时间" value={config.updatedAt ? formatDateTime(config.updatedAt) : "暂无"} />
               </div>
               <div className="ml-8 flex items-center gap-5 border-l border-[#e4ebf6] pl-8">
                 <IconButton label="编辑" icon={Pencil} onClick={() => setEditing(item.id)} />
                 <IconButton label="测试" icon={Rocket} onClick={() => void testConfig(item.name, item.id)} />
-                <IconButton label="删除" icon={Trash2} danger onClick={() => { setConfig({ ...config, [item.id]: "" }); onAction(`${item.name}已清空，点击保存后生效`); }} />
+                <IconButton label="删除" icon={Trash2} danger onClick={() => { void patchConfig(item.id, "").then(() => onAction(`${item.name}已删除或清空`)).catch((err) => onAction(err instanceof Error ? err.message : "删除失败")); }} />
               </div>
             </section>
           );
@@ -540,7 +623,15 @@ function ApiPanel({ config: initialConfig, onSaved, onAction }: { config: ApiCon
         </div>
       </Panel>
       <button type="button" onClick={() => void saveConfig("全部配置")} className="admin-primary h-12 w-full"><Save className="h-4 w-4" />保存所有配置</button>
-      {editing ? <EditConfigModal field={editing} config={config} setConfig={setConfig} onClose={() => setEditing(null)} onSave={() => { void saveConfig("API 配置"); setEditing(null); }} /> : null}
+      {editing ? <EditConfigModal item={allApiItems.find((item) => item.id === editing)} config={config} onClose={() => setEditing(null)} onSave={(key, value, endpointKey, endpointValue) => {
+        void (async () => {
+          await patchConfig(key, value);
+          if (endpointKey) await patchConfig(endpointKey, endpointValue);
+          setEditing(null);
+          onAction("API 配置已保存");
+        })().catch((err) => onAction(err instanceof Error ? err.message : "保存失败"));
+      }} /> : null}
+      {customOpen ? <CustomConfigModal onClose={() => setCustomOpen(false)} onSaved={(saved) => { const next = { ...defaultApiConfig, ...saved }; setConfig(next); onSaved(next); setCustomOpen(false); onAction("自定义配置已新增"); }} /> : null}
     </div>
   );
 }
@@ -549,16 +640,27 @@ function NoticePanel({ notices, setNotices, onAction }: { notices: Notice[]; set
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("全部状态");
   const [editing, setEditing] = useState<Notice | null>(null);
-  const filtered = notices.filter((notice) => (status === "全部状态" || notice.status === status) && notice.title.includes(query));
-  function saveNotice(notice: Notice) {
-    if (notices.some((item) => item.id === notice.id)) setNotices(notices.map((item) => item.id === notice.id ? notice : item));
-    else setNotices([notice, ...notices]);
+  const filtered = notices.filter((notice) => (status === "全部状态" || noticeStatusLabel(notice.status) === status) && notice.title.includes(query));
+  async function saveNotice(notice: Notice) {
+    const payload = { title: notice.title, type: notice.type, status: notice.status, content: notice.content };
+    const exists = notices.some((item) => item.id === notice.id);
+    const saved = await apiJson<Notice>(exists ? `/api/admin/announcements/${notice.id}` : "/api/admin/announcements", {
+      method: exists ? "PUT" : "POST",
+      body: JSON.stringify(payload),
+    });
+    if (exists) setNotices(notices.map((item) => item.id === notice.id ? { ...saved, time: formatDateTime(saved.time) } : item));
+    else setNotices([{ ...saved, time: formatDateTime(saved.time) }, ...notices]);
     setEditing(null);
     onAction("公告已保存");
   }
+  async function deleteNotice(id: string) {
+    await apiJson(`/api/admin/announcements/${id}`, { method: "DELETE" });
+    setNotices(notices.filter((item) => item.id !== id));
+    onAction("公告已删除");
+  }
   return (
     <div className="space-y-6">
-      <PageTitle title="公告管理" desc="发布和管理平台公告，及时向用户传达重要信息。" action={<button type="button" onClick={() => setEditing({ id: `${Date.now()}`, title: "", type: "系统通知", status: "草稿", time: nowText() })} className="admin-primary"><Plus className="h-4 w-4" />新建公告</button>} />
+      <PageTitle title="公告管理" desc="发布和管理平台公告，及时向用户传达重要信息。" action={<button type="button" onClick={() => setEditing({ id: `${Date.now()}`, title: "", type: "系统通知", status: "DRAFT", content: "", time: nowText() })} className="admin-primary"><Plus className="h-4 w-4" />新建公告</button>} />
       <FilterBar>
         <SearchBox value={query} onChange={setQuery} placeholder="请输入公告标题" />
         <SelectBox value={status} onChange={setStatus} options={["全部状态", "已发布", "草稿"]} />
@@ -569,14 +671,14 @@ function NoticePanel({ notices, setNotices, onAction }: { notices: Notice[]; set
         <AdminTable headers={["标题", "类型", "状态", "发布时间", "操作"]}>
           {filtered.map((notice) => (
             <tr key={notice.id} className="admin-tr">
-              <td>{notice.title}</td><td><TypeBadge value={notice.type} /></td><td><StatusBadge value={notice.status} /></td><td>{notice.time}</td>
-              <td><ActionGroup actions={[["编辑", () => setEditing(notice)], ["删除", () => setNotices(notices.filter((item) => item.id !== notice.id))]]} /></td>
+              <td>{notice.title}</td><td><TypeBadge value={notice.type} /></td><td><StatusBadge value={noticeStatusLabel(notice.status)} /></td><td>{notice.time}</td>
+              <td><ActionGroup actions={[["编辑", () => setEditing(notice)], ["删除", () => void deleteNotice(notice.id)]]} /></td>
             </tr>
           ))}
         </AdminTable>
         <Pagination total={filtered.length} pageSize="10 条/页" />
       </Panel>
-      {editing ? <NoticeModal notice={editing} onClose={() => setEditing(null)} onSave={saveNotice} /> : null}
+      {editing ? <NoticeModal notice={editing} onClose={() => setEditing(null)} onSave={(notice) => void saveNotice(notice)} /> : null}
     </div>
   );
 }
@@ -589,8 +691,8 @@ function Panel({ title, children, action }: { title: string; children: ReactNode
   return <section className="rounded-xl border border-[#e3ebf6] bg-white p-6 shadow-[0_14px_36px_rgba(39,76,135,0.08)]">{title || action ? <div className="mb-5 flex items-center justify-between"><h2 className="text-lg font-black">{title}</h2>{action}</div> : null}{children}</section>;
 }
 
-function MetricCard({ label, value, delta, icon: Icon, tone }: { label: string; value: string | number; delta: string; icon: ComponentType<{ className?: string }>; tone: string }) {
-  return <section className="flex items-center gap-5 rounded-xl border border-[#e3ebf6] bg-white p-6 shadow-[0_14px_36px_rgba(39,76,135,0.08)]"><div className={`flex h-16 w-16 items-center justify-center rounded-full ${toneBg(tone)}`}><Icon className={`h-8 w-8 ${accentText(tone)}`} /></div><div><div className="text-sm font-bold text-[#7b88a4]">{label}</div><div className="mt-2 text-[30px] font-black leading-none">{typeof value === "number" ? formatNumber(value) : value}</div><div className={`mt-3 text-sm font-bold ${delta.startsWith("-") ? "text-red-500" : "text-emerald-500"}`}>较昨日 {delta}</div></div></section>;
+function MetricCard({ label, value, sub, icon: Icon, tone }: { label: string; value: string | number; sub: string; icon: ComponentType<{ className?: string }>; tone: string }) {
+  return <section className="flex items-center gap-5 rounded-xl border border-[#e3ebf6] bg-white p-6 shadow-[0_14px_36px_rgba(39,76,135,0.08)]"><div className={`flex h-16 w-16 items-center justify-center rounded-full ${toneBg(tone)}`}><Icon className={`h-8 w-8 ${accentText(tone)}`} /></div><div><div className="text-sm font-bold text-[#7b88a4]">{label}</div><div className="mt-2 text-[30px] font-black leading-none">{typeof value === "number" ? formatNumber(value) : value}</div><div className="mt-3 text-sm font-bold text-[#667693]">{sub}</div></div></section>;
 }
 
 function SummaryCard({ icon: Icon, label, value, tone }: { icon: ComponentType<{ className?: string }>; label: string; value: number; tone: string }) {
@@ -598,8 +700,9 @@ function SummaryCard({ icon: Icon, label, value, tone }: { icon: ComponentType<{
 }
 
 function TrendChart({ data, loading }: { data: AdminDashboard["trend"]; loading: boolean }) {
-  const rows = data.length ? data : [{ date: "05-14", requests: 45000 }, { date: "05-15", requests: 49000 }, { date: "05-16", requests: 65000 }, { date: "05-17", requests: 46000 }, { date: "05-18", requests: 42000 }, { date: "05-19", requests: 50000 }, { date: "05-20", requests: 60000 }];
   if (loading) return <EmptyState text="正在加载趋势数据..." />;
+  const rows = data;
+  if (!rows.length || rows.every((item) => item.requests === 0)) return <EmptyState text="暂无真实请求趋势数据" />;
   const max = Math.max(...rows.map((item) => item.requests), 1);
   const points = rows.map((item, index) => ({ ...item, x: 40 + index * (640 / Math.max(rows.length - 1, 1)), y: 230 - (item.requests / max) * 185 }));
   const path = buildSmoothPath(points);
@@ -614,8 +717,8 @@ function DonutPanel({ data }: { data: Array<{ name: string; value: number }> }) 
   return <div className="grid min-h-[310px] grid-cols-[220px_1fr] items-center gap-8"><div className="mx-auto h-[190px] w-[190px] rounded-full" style={{ background: `conic-gradient(${gradient})` }}><div className="relative left-[48px] top-[48px] h-[94px] w-[94px] rounded-full bg-white" /></div><div className="space-y-4">{data.map((item, index) => <div key={item.name} className="grid grid-cols-[1fr_64px] items-center gap-4 text-sm"><span className="flex items-center gap-3 font-bold text-[#53617d]"><i className="h-3 w-3 rounded-full" style={{ backgroundColor: colors[index % colors.length] }} />{item.name}</span><span className="text-right font-black">{formatPercent(item.value, total)}</span></div>)}</div></div>;
 }
 
-function RankCard({ rank, name }: { rank: number; name: string }) {
-  return <div className="relative rounded-lg border border-[#e3ebf6] bg-[#fbfdff] p-5"><span className={`absolute left-5 top-5 flex h-6 w-6 items-center justify-center rounded-full text-xs font-black text-white ${rank <= 3 ? "bg-[#ff9f2d]" : "bg-[#667693]"}`}>{rank}</span><div className="mx-auto mt-2 flex h-14 w-14 items-center justify-center rounded-full bg-[#eef5ff] text-[#176bff]"><FileText className="h-7 w-7" /></div><div className="mt-4 text-center font-black">{name}</div><div className="mt-4 grid grid-cols-2 gap-3 text-center text-xs text-[#667693]"><div>使用次数<br /><b className="text-[#53617d]">{formatNumber(86000 + rank * 24000)}</b></div><div>占比<br /><b className="text-[#53617d]">{(36 / rank).toFixed(1)}%</b></div></div></div>;
+function RankCard({ rank, name, count, share }: { rank: number; name: string; count: number; share: number }) {
+  return <div className="relative rounded-lg border border-[#e3ebf6] bg-[#fbfdff] p-5"><span className={`absolute left-5 top-5 flex h-6 w-6 items-center justify-center rounded-full text-xs font-black text-white ${rank <= 3 ? "bg-[#ff9f2d]" : "bg-[#667693]"}`}>{rank}</span><div className="mx-auto mt-2 flex h-14 w-14 items-center justify-center rounded-full bg-[#eef5ff] text-[#176bff]"><FileText className="h-7 w-7" /></div><div className="mt-4 text-center font-black">{name}</div><div className="mt-4 grid grid-cols-2 gap-3 text-center text-xs text-[#667693]"><div>使用次数<br /><b className="text-[#53617d]">{formatNumber(count)}</b></div><div>占比<br /><b className="text-[#53617d]">{share.toFixed(1)}%</b></div></div></div>;
 }
 
 function FilterBar({ children }: { children: ReactNode }) {
@@ -627,7 +730,7 @@ function SearchBox({ value, onChange, placeholder }: { value: string; onChange: 
 }
 
 function SelectBox({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: string[] }) {
-  return <label className="relative"><select value={value} onChange={(event) => onChange(event.target.value)} className="h-11 w-[190px] appearance-none rounded-lg border border-[#dce6f5] bg-white px-4 text-sm font-bold text-[#53617d] outline-none"><>{options.map((option) => <option key={option}>{option}</option>)}</></select><ChevronDown className="pointer-events-none absolute right-4 top-3.5 h-4 w-4 text-[#8b98b2]" /></label>;
+  return <label className="relative"><select value={value} onChange={(event) => onChange(event.target.value)} className="h-11 w-[190px] appearance-none rounded-lg border border-[#dce6f5] bg-white px-4 text-sm font-bold text-[#53617d] outline-none">{options.map((option) => <option key={option}>{option}</option>)}</select><ChevronDown className="pointer-events-none absolute right-4 top-3.5 h-4 w-4 text-[#8b98b2]" /></label>;
 }
 
 function AdminTable({ headers, children }: { headers: string[]; children: ReactNode }) {
@@ -669,14 +772,92 @@ function SecretInput({ value, visible, onToggle, onChange }: { value: string; vi
   return <span className="flex h-11 items-center rounded-lg border border-[#dce6f5] bg-white px-4 transition focus-within:border-[#176bff] focus-within:ring-4 focus-within:ring-blue-50"><input className="min-w-0 flex-1 bg-transparent font-mono text-sm outline-none" type={visible ? "text" : "password"} value={value} onChange={(event) => onChange(event.target.value)} placeholder="请输入密钥或授权码" /><button type="button" onClick={onToggle} className="ml-3 text-[#8b98b2]">{visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></span>;
 }
 
-function EditConfigModal({ field, config, setConfig, onClose, onSave }: { field: keyof ApiConfig | "smtp"; config: ApiConfig; setConfig: (config: ApiConfig) => void; onClose: () => void; onSave: () => void }) {
-  const key = field === "smtp" ? "smtpPassword" : field;
-  return <Modal title="编辑 API 配置" onClose={onClose}><AdminField label="配置值"><textarea className="min-h-[120px] w-full rounded-lg border border-[#dce6f5] bg-white px-4 py-3 font-mono text-sm outline-none focus:border-[#176bff] focus:ring-4 focus:ring-blue-50" value={String(config[key] || "")} onChange={(event) => setConfig({ ...config, [key]: event.target.value })} /></AdminField><div className="mt-5 flex justify-end gap-3"><button type="button" onClick={onClose} className="admin-secondary">取消</button><button type="button" onClick={onSave} className="admin-primary"><Save className="h-4 w-4" />保存</button></div></Modal>;
+function EditConfigModal({ item, config, onClose, onSave }: { item?: ApiItem; config: ApiConfig; onClose: () => void; onSave: (key: string, value: string, endpointKey: string, endpointValue: string) => void }) {
+  const key = item?.id || "";
+  const endpointKey = item && (item.endpoint.endsWith("BaseUrl") || item.endpoint === "smtpHost") ? item.endpoint : "";
+  const [value, setValue] = useState(String(config[key] || ""));
+  const [endpointValue, setEndpointValue] = useState(endpointKey ? String(config[endpointKey] || "") : item?.endpoint || "");
+  return <Modal title="编辑 API 配置" onClose={onClose}><div className="space-y-4"><AdminField label="配置名称"><input className="admin-input" value={item?.name || key} readOnly /></AdminField><AdminField label="配置键"><input className="admin-input font-mono" value={key} readOnly /></AdminField>{endpointKey ? <AdminField label="接口地址"><input className="admin-input" value={endpointValue} onChange={(event) => setEndpointValue(event.target.value)} placeholder="请输入接口 Base URL 或 SMTP 主机" /></AdminField> : null}<AdminField label="API 密钥 / 授权值"><textarea className="min-h-[120px] w-full rounded-lg border border-[#dce6f5] bg-white px-4 py-3 font-mono text-sm outline-none focus:border-[#176bff] focus:ring-4 focus:ring-blue-50" value={value} onChange={(event) => setValue(event.target.value)} placeholder="请输入真实可用的 API Key、Cookie 或授权码" /></AdminField></div><div className="mt-5 flex justify-end gap-3"><button type="button" onClick={onClose} className="admin-secondary">取消</button><button type="button" onClick={() => onSave(key, value, endpointKey, endpointValue)} className="admin-primary"><Save className="h-4 w-4" />保存</button></div></Modal>;
+}
+
+function GenerateCardModal({ onClose, onCreated }: { onClose: () => void; onCreated: (cards: CardSecret[]) => void }) {
+  const [type, setType] = useState("月卡");
+  const [quota, setQuota] = useState(300);
+  const [count, setCount] = useState(10);
+  const [validDays, setValidDays] = useState(30);
+  const [prefix, setPrefix] = useState("LK");
+  const [submitting, setSubmitting] = useState(false);
+  const typeDays: Record<string, number> = { 日卡: 1, 周卡: 7, 月卡: 30, 季卡: 90, 年卡: 365, 体验卡: 3 };
+  async function submit() {
+    setSubmitting(true);
+    try {
+      const result = await apiJson<{ cards: CardSecret[] }>("/api/admin/cards/generate", { method: "POST", body: JSON.stringify({ type, quota, count, valid_days: validDays, prefix }) });
+      onCreated(result.cards);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+  return <Modal title="生成卡密" onClose={onClose}><div className="grid grid-cols-2 gap-4"><AdminField label="卡密类型"><SelectBox value={type} onChange={(value) => { setType(value); setValidDays(typeDays[value] ?? validDays); }} options={["日卡", "周卡", "月卡", "季卡", "年卡", "体验卡"]} /></AdminField><AdminField label="生成数量"><input className="admin-input" type="number" min={1} max={200} value={count} onChange={(event) => setCount(Number(event.target.value))} /></AdminField><AdminField label="可用次数 / 面值"><input className="admin-input" type="number" min={1} value={quota} onChange={(event) => setQuota(Number(event.target.value))} /></AdminField><AdminField label="多久不用自动过期（天）"><input className="admin-input" type="number" min={1} max={3650} value={validDays} onChange={(event) => setValidDays(Number(event.target.value))} /></AdminField><AdminField label="卡密前缀"><input className="admin-input" value={prefix} onChange={(event) => setPrefix(event.target.value)} /></AdminField></div><div className="mt-5 flex justify-end gap-3"><button type="button" onClick={onClose} className="admin-secondary">取消</button><button type="button" disabled={submitting} onClick={() => void submit()} className="admin-primary disabled:bg-[#8ba3c8]"><Plus className="h-4 w-4" />生成</button></div></Modal>;
+}
+
+function UserDetailModal({ user, onClose }: { user: ManagedUser; onClose: () => void }) {
+  return <Modal title="用户详情" onClose={onClose}><div className="grid grid-cols-2 gap-4 text-sm"><InfoBox label="用户 ID" value={user.id} /><InfoBox label="用户名" value={user.username} /><InfoBox label="邮箱" value={user.email} /><InfoBox label="账号状态" value={user.isDisabled ? "已禁用" : "正常"} /><InfoBox label="用户类型" value={user.membershipStatus || "FREE"} /><InfoBox label="注册时间" value={user.createdAt} /></div></Modal>;
+}
+
+function InfoBox({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-lg border border-[#e3ebf6] bg-[#f8fbff] p-4"><div className="text-xs font-black text-[#7b88a4]">{label}</div><div className="mt-2 break-all font-black text-[#101936]">{value}</div></div>;
+}
+
+function PasswordModal({ onClose, onAction }: { onClose: () => void; onAction: (message: string) => void }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  async function submit() {
+    setSubmitting(true);
+    try {
+      await apiJson("/api/admin/password", { method: "PUT", body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }) });
+      onAction("管理员密码已修改");
+      onClose();
+    } catch (err) {
+      onAction(err instanceof Error ? err.message : "修改密码失败");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+  return <Modal title="修改密码" onClose={onClose}><div className="space-y-4"><AdminField label="当前密码"><input className="admin-input" type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} /></AdminField><AdminField label="新密码"><input className="admin-input" type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="至少 8 位" /></AdminField></div><div className="mt-5 flex justify-end gap-3"><button type="button" onClick={onClose} className="admin-secondary">取消</button><button type="button" disabled={submitting} onClick={() => void submit()} className="admin-primary disabled:bg-[#8ba3c8]"><Save className="h-4 w-4" />保存</button></div></Modal>;
+}
+
+function CustomConfigModal({ onClose, onSaved }: { onClose: () => void; onSaved: (config: ApiConfig) => void }) {
+  const [presetLabel, setPresetLabel] = useState<string>(API_PRESETS[0].label);
+  const preset: (typeof API_PRESETS)[number] = API_PRESETS.find((item) => item.label === presetLabel) ?? API_PRESETS[0];
+  const [name, setName] = useState("");
+  const [key, setKey] = useState("");
+  const [endpoint, setEndpoint] = useState("");
+  const [value, setValue] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  async function submit() {
+    setSubmitting(true);
+    try {
+      let saved: ApiConfig;
+      if (preset.key === "custom") {
+        saved = await apiJson<ApiConfig>("/api/admin/config/custom", { method: "POST", body: JSON.stringify({ key: key || name, label: name || "自定义 API", group: "custom", endpoint, value, secret: true, description: "后台新增的自定义 API 配置" }) });
+      } else {
+        saved = await apiJson<ApiConfig>("/api/admin/config", { method: "PATCH", body: JSON.stringify({ key: preset.key, value }) });
+        if (preset.endpointKey && endpoint) {
+          saved = await apiJson<ApiConfig>("/api/admin/config", { method: "PATCH", body: JSON.stringify({ key: preset.endpointKey, value: endpoint }) });
+        }
+      }
+      onSaved(saved);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+  return <Modal title="新增 API 配置" onClose={onClose}><div className="space-y-4"><AdminField label="选择前端功能"><SelectBox value={presetLabel} onChange={setPresetLabel} options={API_PRESETS.map((item) => item.label)} /></AdminField>{preset.key === "custom" ? <div className="grid grid-cols-2 gap-4"><AdminField label="配置名称"><input className="admin-input" value={name} onChange={(event) => setName(event.target.value)} placeholder="例如 OCR 识别 API" /></AdminField><AdminField label="配置键"><input className="admin-input font-mono" value={key} onChange={(event) => setKey(event.target.value)} placeholder="ocrApiKey" /></AdminField></div> : <InfoBox label="将写入配置键" value={`${preset.key}${preset.endpointKey ? ` / ${preset.endpointKey}` : ""}`} />}<AdminField label="接口地址"><input className="admin-input" value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder={preset.placeholder} /></AdminField><AdminField label="API 密钥 / 授权值"><textarea className="min-h-[120px] w-full rounded-lg border border-[#dce6f5] bg-white px-4 py-3 font-mono text-sm outline-none focus:border-[#176bff] focus:ring-4 focus:ring-blue-50" value={value} onChange={(event) => setValue(event.target.value)} placeholder="请输入真实 API Key、Cookie 或 SMTP 授权码" /></AdminField></div><div className="mt-5 flex justify-end gap-3"><button type="button" onClick={onClose} className="admin-secondary">取消</button><button type="button" disabled={submitting} onClick={() => void submit()} className="admin-primary disabled:bg-[#8ba3c8]"><Plus className="h-4 w-4" />新增配置</button></div></Modal>;
 }
 
 function NoticeModal({ notice, onClose, onSave }: { notice: Notice; onClose: () => void; onSave: (notice: Notice) => void }) {
   const [draft, setDraft] = useState(notice);
-  return <Modal title="公告编辑" onClose={onClose}><div className="space-y-4"><AdminField label="公告标题"><input className="admin-input" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="请输入公告标题" /></AdminField><div className="grid grid-cols-2 gap-4"><AdminField label="类型"><SelectBox value={draft.type} onChange={(value) => setDraft({ ...draft, type: value as Notice["type"] })} options={["系统通知", "重要通知", "功能更新", "使用指南"]} /></AdminField><AdminField label="状态"><SelectBox value={draft.status} onChange={(value) => setDraft({ ...draft, status: value as Notice["status"] })} options={["已发布", "草稿"]} /></AdminField></div></div><div className="mt-5 flex justify-end gap-3"><button type="button" onClick={onClose} className="admin-secondary">取消</button><button type="button" onClick={() => onSave({ ...draft, time: draft.time || nowText() })} className="admin-primary"><Save className="h-4 w-4" />保存公告</button></div></Modal>;
+  return <Modal title="公告编辑" onClose={onClose}><div className="space-y-4"><AdminField label="公告标题"><input className="admin-input" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="请输入公告标题" /></AdminField><div className="grid grid-cols-2 gap-4"><AdminField label="类型"><SelectBox value={draft.type} onChange={(value) => setDraft({ ...draft, type: value as Notice["type"] })} options={["系统通知", "重要通知", "功能更新", "使用指南"]} /></AdminField><AdminField label="状态"><SelectBox value={noticeStatusLabel(draft.status)} onChange={(value) => setDraft({ ...draft, status: value === "已发布" ? "PUBLISHED" : "DRAFT" })} options={["已发布", "草稿"]} /></AdminField></div><AdminField label="公告内容"><textarea className="min-h-[160px] w-full resize-y rounded-lg border border-[#dce6f5] bg-white px-4 py-3 text-sm outline-none focus:border-[#176bff] focus:ring-4 focus:ring-blue-50" value={draft.content} onChange={(event) => setDraft({ ...draft, content: event.target.value })} placeholder="请输入公告正文，支持填写维护时间、影响范围、更新说明等内容" /></AdminField></div><div className="mt-5 flex justify-end gap-3"><button type="button" onClick={onClose} className="admin-secondary">取消</button><button type="button" onClick={() => onSave({ ...draft, time: draft.time || nowText() })} className="admin-primary"><Save className="h-4 w-4" />保存公告</button></div></Modal>;
 }
 
 function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
@@ -687,9 +868,25 @@ function EmptyState({ text }: { text: string }) {
   return <div className="flex h-[220px] items-center justify-center rounded-lg border border-dashed border-[#dce6f5] bg-[#f8fbff] text-sm font-bold text-[#8b98b2]">{text}</div>;
 }
 
-function stripUpdatedAt(config: ApiConfig) {
-  const { updatedAt: _updatedAt, ...payload } = config;
-  return payload;
+function stripBuiltInConfig(config: ApiConfig) {
+  const { updatedAt: _updatedAt, customFields: _customFields, ...payload } = config;
+  const allowed = new Set([
+    "contentApiKey", "contentApiBaseUrl", "contentModel",
+    "imageApiKey", "imageApiBaseUrl", "imageModel",
+    "speechApiKey", "speechApiBaseUrl", "speechModel",
+    "copyExtractApiKey", "videoParseProvider", "videoParseApiKey", "videoParseApiBaseUrl",
+    "rapidApiKey", "siliconflowApiKey", "biliCookie", "douyinCookie", "xhsCookie",
+    "wechatSupportId", "smtpHost", "smtpPort", "smtpUser", "smtpPassword", "smtpSecure", "smtpFromName",
+  ]);
+  return Object.fromEntries(Object.entries(payload).filter(([key]) => allowed.has(key)));
+}
+
+function cardStatusLabel(status: CardSecret["status"] | string) {
+  return { UNUSED: "未使用", USED: "已使用", EXPIRED: "已过期" }[status] ?? status;
+}
+
+function noticeStatusLabel(status: Notice["status"] | string) {
+  return status === "PUBLISHED" ? "已发布" : "草稿";
 }
 
 function formatNumber(value: number) {
@@ -730,12 +927,18 @@ function accentText(tone: string) {
 }
 
 function exportCsv(filename: string, rows: unknown[]) {
-  const text = JSON.stringify(rows, null, 2);
-  const blob = new Blob([text], { type: "application/json;charset=utf-8" });
+  const records = rows.filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object" && !Array.isArray(row));
+  const headers = Array.from(records.reduce((set, row) => {
+    Object.keys(row).forEach((key) => set.add(key));
+    return set;
+  }, new Set<string>()));
+  const escapeCell = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+  const text = [headers.join(","), ...records.map((row) => headers.map((key) => escapeCell(row[key])).join(","))].join("\n");
+  const blob = new Blob([`\uFEFF${text}`], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = filename.replace(".csv", ".json");
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();

@@ -149,6 +149,8 @@ class SQLiteDB:
         self.job = SQLiteJobTable(self, "jobs")
         self.fileasset = SQLiteFileTable(self, "file_assets")
         self.appsetting = SQLiteTable(self, "app_settings")
+        self.cardkey = SQLiteTable(self, "card_keys")
+        self.announcement = SQLiteTable(self, "announcements")
 
     def is_connected(self) -> bool:
         return self.conn is not None
@@ -175,6 +177,7 @@ class SQLiteDB:
                 email TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
                 membership_status TEXT NOT NULL DEFAULT 'FREE',
+                is_disabled INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -209,8 +212,33 @@ class SQLiteDB:
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS card_keys (
+                id TEXT PRIMARY KEY,
+                code TEXT UNIQUE NOT NULL,
+                type TEXT NOT NULL,
+                quota INTEGER NOT NULL,
+                valid_days INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'UNUSED',
+                used_by TEXT,
+                used_at TEXT,
+                expires_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS announcements (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                type TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'DRAFT',
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
             """
         )
+        columns = [row["name"] for row in self.conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "is_disabled" not in columns:
+            self.conn.execute("ALTER TABLE users ADD COLUMN is_disabled INTEGER NOT NULL DEFAULT 0")
         self.conn.commit()
 
     def prepare_payload(self, table: str, data: dict[str, Any], include_id: bool = True) -> dict[str, Any]:

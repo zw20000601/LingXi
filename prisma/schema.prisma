@@ -31,6 +31,7 @@ model User {
   email             String           @unique
   password_hash     String
   membership_status MembershipStatus @default(FREE)
+  is_disabled       Boolean          @default(false)
   created_at        DateTime         @default(now())
   updated_at        DateTime         @updatedAt
   jobs              Job[]
@@ -78,4 +79,45 @@ model FileAsset {
   @@index([user_id, created_at])
   @@index([expires_at])
   @@map("file_assets")
+}
+
+model AppSetting {
+  id         String   @id @default(uuid())
+  key        String   @unique
+  value      String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
+model CardKey {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  type       String
+  quota      Int
+  valid_days Int
+  status     String   @default("UNUSED")
+  used_by    String?
+  used_at    DateTime?
+  expires_at DateTime
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([status])
+  @@index([expires_at])
+  @@map("card_keys")
+}
+
+model Announcement {
+  id         String   @id @default(uuid())
+  title      String
+  type       String
+  status     String   @default("DRAFT")
+  content    String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([status])
+  @@map("announcements")
 }

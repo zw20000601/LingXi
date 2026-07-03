@@ -1,11 +1,11 @@
 import secrets
 import time
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.db import db
 from app.core.config import settings
-from app.core.deps import is_admin_user
+from app.core.deps import current_user, is_admin_user
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.schemas import AuthPayload, AuthResponse, RegisterPayload, SendCodePayload, SendCodeResponse
 from app.services.mailer import send_verification_code_email
@@ -72,5 +72,12 @@ async def login(payload: AuthPayload):
     user = await db.user.find_unique(where={"email": payload.email})
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+    if bool(getattr(user, "is_disabled", False)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled")
 
     return {"access_token": create_access_token(user.id), "user": serialize_user(user)}
+
+
+@router.get("/me")
+async def me(user=Depends(current_user)):
+    return serialize_user(user)

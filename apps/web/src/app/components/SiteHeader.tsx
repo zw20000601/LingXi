@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
-import { getToken } from "@/lib/api";
+import { apiJson, getToken } from "@/lib/api";
 
 export type ActiveKey = "home" | "features" | "video" | "document" | "pdf" | "help";
 
@@ -24,12 +24,28 @@ export function SiteHeader({ active, blend = false }: { active: ActiveKey; blend
     function syncAuthState() {
       setLoggedIn(Boolean(getToken()));
     }
+    async function verifyAccount() {
+      if (!getToken()) {
+        setLoggedIn(false);
+        return;
+      }
+      try {
+        await apiJson("/api/auth/me");
+        setLoggedIn(true);
+      } catch {
+        window.localStorage.removeItem("lingxi_token");
+        setLoggedIn(false);
+        window.alert("账号已被禁用或登录已失效，请重新登录");
+      }
+    }
     syncAuthState();
+    const timer = window.setInterval(() => { void verifyAccount(); }, 3000);
     window.addEventListener("storage", syncAuthState);
-    window.addEventListener("focus", syncAuthState);
+    window.addEventListener("focus", verifyAccount);
     return () => {
+      window.clearInterval(timer);
       window.removeEventListener("storage", syncAuthState);
-      window.removeEventListener("focus", syncAuthState);
+      window.removeEventListener("focus", verifyAccount);
     };
   }, []);
 
